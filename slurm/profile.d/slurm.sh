@@ -1,4 +1,4 @@
-# Time-stamp: <Wed 2020-06-10 14:23 svarrette>
+# Time-stamp: <Wed 2020-06-10 14:49 svarrette>
 ################################################################################
 # [/etc/]profile.d/slurm.sh - Various Slurm helper functions and aliases to
 # .                           use on the UL HPC Platform (https://hpc.uni.lu)
@@ -140,11 +140,20 @@ userjobs(){
 }
 
 ## sinfo helpers
-alias nodelist='sinfo -e -o "%15N %5D %6X %5Y %8Z %5c %8m  %15f %20G"'
+alias nodelist='sinfo -e -o "%15N %5D %6X %5Y %8Z %5c %8m  %20f %20G"'
 alias allocnodes='sinfo -h -t mix,alloc -o %N'
 alias idlenodes='sinfo -h -t idle -o %N'
 alias deadnodes='sinfo -d'
 alias sissues='sinfo -R -o "%45E %19H %6t %N"'
+
+## Utilization Report
+gpuload() {
+    #gpumax=$(sinfo -h -N -p gpu -o %G | cut -d : -f3 | paste -sd + | bc)
+    gpumax=96
+    gpuused=$(squeue -h -t R -p gpu -o "%b*%D" | grep gpu | cut -d , -f 1 | cut -d : -f 2 | sed 's/gpu/1/g'  | paste -sd '+' |bc)
+    gpuusage=$(echo "$gpuused*100/$gpumax" | bc -l)
+    printf "GPU: %s/%s (%2.1f%%)\n" "$gpuused" "$gpumax" "$gpuusage"
+}
 
 # Overview of the Slurm partition load
 pload() {
@@ -154,14 +163,20 @@ pload() {
         case $1 in
             -a | --all) partition="interactive batch gpu bigmem";;
             -h | --no-header) no_header=$1;;
-            *) partition=$*; break;;
+            i  | int*) partition="interactive";;
+            b  | bat*) partition="batch";;
+            l  | lon*) partition="long";;
+            g  | gpu*) partition="gpu";;
+            m  | big*) partition="bigmem";;
+            *) echo "Unknown partition '$1'"; return;;
         esac
         shift
     done
     if [[ -z "$partition" ]]; then
         echo "Usage: pload [-a] [--no-header] <partition>"
         echo " => Show current load of the slurm partition <partition>, eventually without header"
-        echo "     -a: show all partitions"
+        echo "    <partition> shortcuts: i=interactive b=batch l=long g=gpu m=bigmem"
+        echo -e " Options:\n   -a: show all partition"
         return
     fi
     [ -z "$no_header" ] && \
@@ -174,8 +189,9 @@ pload() {
         #cpuused=$(echo $usage | cut -d '/' -f 1)
         cpufree=$(echo $usage | cut -d '/' -f 2)
         usageratio=$(echo "$cpuused*100/$cpumax" | bc -l)
+        [ "$partition" == "gpu" ] && gpustats=$(gpuload) || gpustats=""
         #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
-        printf "%12s %8s %9s %9s %10.1f%% \n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio"
+        printf "%12s %8s %9s %9s %10.1f%% %s\n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio" "$gpustats"
     done
 }
 listpartitionjobs(){
@@ -249,16 +265,7 @@ qload() {
         qoscpuused=$(echo "$qoscpualloc+$qoscpuother" | bc)
         qoscpufree=$(echo "$qoscpumax-$qoscpuused"    | bc)
         [ "${qoscpumax}" == "0" ] && qosusage=0 || qosusage=$(echo "$qoscpuused*100/$qoscpumax" | bc -l)
-        if [ "$partition" == "gpu" ]; then
-            #gpumax=$(sinfo -h -N -p gpu -o %G | cut -d : -f3 | paste -sd + | bc)
-            gpumax=96
-            gpuused=$(squeue -h -t R -p gpu -o "%b*%D" | grep gpu | cut -d , -f 1 | cut -d : -f 2 | sed 's/gpu/1/g'  | paste -sd '+' |bc)
-            gpuusage=$(echo "$gpuused*100/$gpumax" | bc -l)
-            gpustats=$(printf "GPU: %s/%s (%2.1f%%)" "$gpuused" "$gpumax" "$gpuusage")
-            #"$(echo "$partitionlimits" | grep $partition) (A/I/O/T) $qoscpualloc+$qoscpuother")
-        else
-            gpustats="" # "$(echo "$partitionlimits" | grep $partition) (A/I/O/T) $qoscpualloc+$qoscpuother"
-        fi
+        [ "$partition" == "gpu" ] && gpustats=$(gpuload) || gpustats="" # "$(echo "$partitionlimits" | grep $partition) (A/I/O/T) $qoscpualloc+$qoscpuother"
         printf "%12s %16s %8s %9s %9s %10.1f%% %12s\n" "$partition" "$qos" "$qoscpumax" "$qoscpuused" "$qoscpufree" "$qosusage" "$gpustats $comment"
     done
     printf "%29s -------- --------- --------- -----------\n" " "
