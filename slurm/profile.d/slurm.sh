@@ -1,4 +1,4 @@
-# Time-stamp: <Wed 2020-06-10 14:54 svarrette>
+# Time-stamp: <Wed 2020-06-10 15:00 svarrette>
 ################################################################################
 # [/etc/]profile.d/slurm.sh - Various Slurm helper functions and aliases to
 # .                           use on the UL HPC Platform (https://hpc.uni.lu)
@@ -243,8 +243,9 @@ qload() {
             qos-long        | l | lon*) partition="long";        qos="qos-${partition}"; q=$qos; use_partition_stats=$pattern;;
             qos-gpu         | g | gpu*) partition="gpu";         qos="qos-${partition}"; q=$qos; use_partition_stats=$pattern;;
             qos-bigmem      | m | big*) partition="bigmem";      qos="qos-${partition}"; q=$qos; use_partition_stats=$pattern;;
-            qos-batch-001   | d | ded*) partition="batch";       qos="(dedicated)";      q="qos-batch-001,qos-covid";;
+            qos-batch-001)              partition="batch";       qos="${pattern}";       q=$qos;;
             qos-batch-00*)              partition="batch";       qos="(industry)";       q=$pattern;;
+            d | ded*)                   partition="batch";       qos="(dedicated)";      q="qos-batch-001,qos-covid";;
             ind*)                       partition="batch";       qos="(industry)";       q="qos-batch-002,qos-batch-003";;
             b | bat*)                   partition="batch";       qos="qos-batch-*";      q="qos-batch,qos-batch-001,qos-covid,qos-batch-002,qos-batch-003"; use_partition_stats=$pattern;;
             qos-covid | cov*)           partition="batch";       qos="qos-covid";        q=$qos;;
