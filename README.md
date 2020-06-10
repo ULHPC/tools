@@ -1,29 +1,46 @@
 ![By ULHPC](https://img.shields.io/badge/by-ULHPC-blue.svg) [![github](https://img.shields.io/badge/git-github-lightgray.svg)](https://github.com/ULHPC/tools) [![Issues](https://img.shields.io/badge/issues-github-green.svg)](https://github.com/ULHPC/tools/issues)
 
-         _    _ _      _    _ _____   _____   _______          _        _______ _                             _       __  
-        | |  | | |    | |  | |  __ \ / ____| |__   __|        | |      / / ____| |                           | |      \ \ 
+         _    _ _      _    _ _____   _____   _______          _        _______ _                             _       __
+        | |  | | |    | |  | |  __ \ / ____| |__   __|        | |      / / ____| |                           | |      \ \
         | |  | | |    | |__| | |__) | |         | | ___   ___ | |___  | | (___ | |_   _ _ __ _ __ ___     ___| |_ ___  | |
         | |  | | |    |  __  |  ___/| |         | |/ _ \ / _ \| / __| | |\___ \| | | | | '__| '_ ` _ \   / _ \ __/ __| | |
         | |__| | |____| |  | | |    | |____     | | (_) | (_) | \__ \ | |____) | | |_| | |  | | | | | | |  __/ |_ (__ _| |
          \____/|______|_|  |_|_|     \_____|    |_|\___/ \___/|_|___/ | |_____/|_|\__,_|_|  |_| |_| |_|  \___|\__\___(_) |
-                                                                       \_\                                            /_/ 
-                                                                                                                          
+                                                                       \_\                                            /_/
+
        Copyright (c) 2020 UL HPC Team <hpc-team@uni.lu>
 
-Various HPC Tools and helper scripts (slurm, ssh etc.)
+Various HPC Tools and helper scripts/functions (slurm, ssh etc.)
+
+```bash
+.
+├── Makefile      # GNU Makefile root configuration
+├── README.md
+├── VERSION       # /!\ DO NOT EDIT: store current version of the repository
+└── slurm         # Slurm tools and utilities
+    └── profile.d
+        └── slurm.sh     # Slurm helpers, to be sourced
+```
+
+Similar project/resources:
+
+* <https://github.com/dieterich-lab/slurm-tools>
+* <https://github.com/OleHolmNielsen/Slurm_tools>
+
+
+
+
 
 ## Installation / Repository Setup
 
 This repository is hosted on [Github](https://github.com/ULHPC/tools).
-
-* To clone this repository, proceed as follows (adapt accordingly):
+To clone this repository, proceed as follows (adapt accordingly):
 
 ```bash
 $> mkdir -p ~/git/github.com/ULHPC/
 $> cd ~/git/github.com/ULHPC/
 $> git clone https://github.com/ULHPC/tools.git
 ```
-
 
 **`/!\ IMPORTANT`**: Once cloned, initiate your local copy of the repository by running:
 
@@ -40,34 +57,13 @@ If upon pulling the repository, you end in a state where another collaborator ha
 
 Finally, you can upgrade the [Git submodules](.gitmodules) to the latest version by running:
 
-    $> make upgrade
+    $> make upgrade    # OR: 'git submodule update'
 
 ## Issues / Feature request
 
 You can submit bug / issues / feature request using the [`ULHPC/tools` Project Tracker](https://github.com/ULHPC/tools/issues)
 
-
-
 ## Misc.
-
-### Git
-
-This repository make use of [Git](http://git-scm.com/). Consider these resources to become more familiar (if not yet) with Git:
-
-* [Simple Git Guide](http://rogerdudler.github.io/git-guide/)
-* [Git book](http://book.git-scm.com/index.html)
-* [Github:help](http://help.github.com/mac-set-up-git/)
-* [Git reference](http://gitref.org/)
-
-At least, you shall configure the following variables
-
-       $> git config --global user.name "Your Name Comes Here"
-       $> git config --global user.email you@yourdomain.example.com
-       # configure colors
-       $> git config --global color.diff auto
-       $> git config --global color.status auto
-       $> git config --global color.branch auto
-
 
 ### [Git-flow](https://github.com/petervanderdoes/gitflow-avh)
 
@@ -113,7 +109,6 @@ Once you have finished to commit your last changes, make the release effective b
       $> make release
 
 It will finish the release using `git-flow`, create the appropriate tag in the `production` branch and merge all things the way they should be.
-
 
 ## Contributing
 
