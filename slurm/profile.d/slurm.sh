@@ -1,4 +1,4 @@
-# Time-stamp: <Wed 2020-06-10 10:03 svarrette>
+# Time-stamp: <Wed 2020-06-10 14:23 svarrette>
 ################################################################################
 # [/etc/]profile.d/slurm.sh - Various Slurm helper functions and aliases to
 # .                           use on the UL HPC Platform (https://hpc.uni.lu)
@@ -44,119 +44,151 @@ export SQUEUE_FORMAT="%.18i %.9P %.15q %.8j %.20u %.4D %.5C %.2t %.12M %.12L %.8
 
 
 ## SLURM helpers
-alias allocnodes='sinfo -h -t mix,alloc -o %N'
-alias idlenodes='sinfo -h -t idle -o %N'
-alias deadnodes='sinfo -d'
 
 ## scontrol helpers
 alias ssj='scontrol show job'
-userjobs(){
-  local user=${1:-$(whoami)}
-  if [ $user == "-h" ]; then
-    echo "Usage: userjobs <login> (Default: $(whoami))"
-    echo " => detail job details for user '${user}'"
-    return
-  fi
-  local squeue_cmd="squeue -u $user -O JOBID -h"
-  local check_empty_squeue="$(eval $squeue_cmd)"
-  if [ -z "$check_empty_squeue" ]; then
-    echo "No job scheduled for user '${user}'"
-    return
-  fi
-  cmd="$squeue_cmd | xargs -n1 scontrol show job"
-  echo "# ${cmd}"
-  eval $cmd
+
+
+## [srun] job helpers
+sjoin(){
+    if [[ -z $1 ]]; then
+        echo "Job ID not given."
+        echo "Usage: sjoin <jobid> [iris-XXX]"
+    else
+        JOBID=$1
+        [[ -n $2 ]] && NODE="-w $2"
+        srun --jobid $JOBID $NODE --pty bash -i
+    fi
+}
+# Stats on past job
+slist(){
+    if [[ -z $1 ]]; then
+        echo "Job ID not given."
+        echo "Usage: slist <jobid> [-X] [...]"
+    else
+        JOBID=$1
+        shift
+        cmd="sacct -j $JOBID --format User,JobID,Jobname%30,partition,state,time,elapsed,MaxRss,MaxVMSize,nnodes,ncpus,nodelist,AveCPU,ConsumedEnergyRaw $*"
+        echo "# ${cmd}"
+        ${cmd}
+        echo "#"
+        echo "# seff $JOBID"
+        echo "#"
+        seff $JOBID
+    fi
 }
 
-
-## job helpers
 function si {
-   local options="$*"
-   cmd="srun -p interactive --qos qos-interactive $options --pty bash"
-   echo "# ${cmd}"
-   $cmd
+    local options="$*"
+    cmd="srun -p interactive --qos qos-interactive $options --pty bash"
+    echo "# ${cmd}"
+    $cmd
 }
 # interactive batch job for 30 min
 function sb {
-   local options="$*"
-   cmd="srun -p batch --qos qos-batch -t 0:30:00 $options --pty batch"
-   echo "# ${cmd}"
-   $cmd
+    local options="$*"
+    cmd="srun -p batch --qos qos-batch -t 0:30:00 $options --pty batch"
+    echo "# ${cmd}"
+    $cmd
 }
 # interactive gpu job for 30 min
 function sgpu {
-  local options="$*"
-  if [[ -z $1 ]]; then
-    echo "Usage: sb <#GPU> [...]"
-    echo " => interactive gpu job for 30 min with <#GPU> GPUs"
-    return
-  fi
-  cmd="srun -p gpu --qos qos-gpu -t 0:30:00 -G $options --pty batch"
-  echo "# ${cmd}"
-  $cmd
+    local options="$*"
+    if [[ -z $1 ]]; then
+        echo "Usage: sb <#GPU> [...]"
+        echo " => interactive gpu job for 30 min with <#GPU> GPUs"
+        return
+    fi
+    cmd="srun -p gpu --qos qos-gpu -t 0:30:00 -G $options --pty batch"
+    echo "# ${cmd}"
+    $cmd
 }
 
 ## squeue helpers
 function sq() {
-  local user=${1:-$(whoami)}
-  cmd="squeue -u ${user}"
-  echo "# ${cmd}"
-  $cmd
+    local user=${1:-$(whoami)}
+    cmd="squeue -u ${user}"
+    echo "# ${cmd}"
+    $cmd
 }
 largejobs(){
-  echo -ne "=> List running jobs using more than 28 cores (slurm CPUs)\n"
-  date +%F-%T
-  squeue -h -o '%i,%C' -t R | awk -F , '{if ($2>28) {print $1}}' | paste -sd ',' | xargs squeue -j
+    echo -ne "=> List running jobs using more than 28 cores (slurm CPUs)\n"
+    date +%F-%T
+    squeue -h -o '%i,%C' -t R | awk -F , '{if ($2>28) {print $1}}' | paste -sd ',' | xargs squeue -j
 }
 longjobs(){
-  echo -ne "=> List jobs running/expected to run for more than 5 days\n"
-  date +%F-%T
- squeue -h -o '%i,%l' | cut -d '-' -f 1 | grep -v ':' | awk -F , '{if ($2>5) {print $1}}' | paste -sd ',' | xargs squeue -o "$SQUEUE_FORMAT,%L" -j
+    echo -ne "=> List jobs running/expected to run for more than 5 days\n"
+    date +%F-%T
+    squeue -h -o '%i,%l' | cut -d '-' -f 1 | grep -v ':' | awk -F , '{if ($2>5) {print $1}}' | paste -sd ',' | xargs squeue -o "$SQUEUE_FORMAT,%L" -j
+}
+userjobs(){
+    local user=${1:-$(whoami)}
+    if [ $user == "-h" ]; then
+        echo "Usage: userjobs <login> (Default: $(whoami))"
+        echo " => detail job details for user '${user}'"
+        return
+    fi
+    local squeue_cmd="squeue -u $user -O JOBID -h"
+    local check_empty_squeue="$(eval $squeue_cmd)"
+    if [ -z "$check_empty_squeue" ]; then
+        echo "No job scheduled for user '${user}'"
+        return
+    fi
+    cmd="$squeue_cmd | xargs -n1 scontrol show job"
+    echo "# ${cmd}"
+    eval $cmd
 }
 
 ## sinfo helpers
+alias nodelist='sinfo -e -o "%15N %5D %6X %5Y %8Z %5c %8m  %15f %20G"'
+alias allocnodes='sinfo -h -t mix,alloc -o %N'
+alias idlenodes='sinfo -h -t idle -o %N'
+alias deadnodes='sinfo -d'
+alias sissues='sinfo -R -o "%45E %19H %6t %N"'
+
+# Overview of the Slurm partition load
 pload() {
-  local no_header=""
-  local partition=""
-  while [ -n "$1" ]; do
-    case $1 in
-      -a | --all) partition="interactive batch gpu bigmem";;
-      -h | --no-header) no_header=$1;;
-      *) partition=$*; break;;
-    esac
-    shift
-  done
-  if [[ -z "$partition" ]]; then
-    echo "Usage: pload [-a] [--no-header] <partition>"
-    echo " => Show current load of the slurm partition <partition>, eventually without header"
-    echo "     -a: show all partitions"
-    return
-  fi
-  [ -z "$no_header" ] && \
-    printf "%12s %8s %9s %9s %12s\n" "Partition" "CPU Max" "CPU Used" "CPU Free" "Usage[%]"
-  for p in $partition; do
-    usage=$(sinfo -h -p $p --format=%C)
-    cpumax=$(echo $usage | cut -d '/' -f 4)
-    # include other (draining, down)
-    cpuused=$(( $(echo $usage | cut -d '/' -f 1) + $(echo $usage | cut -d '/' -f 3) ))
-    #cpuused=$(echo $usage | cut -d '/' -f 1)
-    cpufree=$(echo $usage | cut -d '/' -f 2)
-    usageratio=$(echo "$cpuused*100/$cpumax" | bc -l)
-    #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
-    printf "%12s %8s %9s %9s %10.1f%% \n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio"
-  done
+    local no_header=""
+    local partition=""
+    while [ -n "$1" ]; do
+        case $1 in
+            -a | --all) partition="interactive batch gpu bigmem";;
+            -h | --no-header) no_header=$1;;
+            *) partition=$*; break;;
+        esac
+        shift
+    done
+    if [[ -z "$partition" ]]; then
+        echo "Usage: pload [-a] [--no-header] <partition>"
+        echo " => Show current load of the slurm partition <partition>, eventually without header"
+        echo "     -a: show all partitions"
+        return
+    fi
+    [ -z "$no_header" ] && \
+        printf "%12s %8s %9s %9s %12s\n" "Partition" "CPU Max" "CPU Used" "CPU Free" "Usage[%]"
+    for p in $partition; do
+        usage=$(sinfo -h -p $p --format=%C)
+        cpumax=$(echo $usage | cut -d '/' -f 4)
+        # include other (draining, down)
+        cpuused=$(( $(echo $usage | cut -d '/' -f 1) + $(echo $usage | cut -d '/' -f 3) ))
+        #cpuused=$(echo $usage | cut -d '/' -f 1)
+        cpufree=$(echo $usage | cut -d '/' -f 2)
+        usageratio=$(echo "$cpuused*100/$cpumax" | bc -l)
+        #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
+        printf "%12s %8s %9s %9s %10.1f%% \n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio"
+    done
 }
 listpartitionjobs(){
-  local partition=${1:-batch}
-  if [[ -z $1 ]]; then
-    echo "Usage: listpartitionjobs <partition>"
-    echo " => list jobs (and current load) of the slurm partition <partition>"
-    return
-  fi
-  echo -ne "=> current load on partition '$partition'\n"
-  pload $partition
-  echo -ne "\n=> Job(s) status\n"
-  squeue -p $partition -h -o "%t,%r"  | sort -r | uniq -c
+    local partition=${1:-batch}
+    if [[ -z $1 ]]; then
+        echo "Usage: listpartitionjobs <partition>"
+        echo " => list jobs (and current load) of the slurm partition <partition>"
+        return
+    fi
+    echo -ne "=> current load on partition '$partition'\n"
+    pload $partition
+    echo -ne "\n=> Job(s) status\n"
+    squeue -p $partition -h -o "%t,%r"  | sort -r | uniq -c
 }
 alias joblistinteractive='listpartitionjobs interactive'
 alias joblistbatch='listpartitionjobs batch'
@@ -258,23 +290,23 @@ irisstat(){
 
 ## sacctmgr helpers
 acct(){
-  if [[ -z $1 ]]; then
-    echo "Usage: acct <login|account>"
-    echo " => get user/account holder"
-    return
-  fi
-  cmd1="sacctmgr show user where name=\"${1}\" format=user,account%20,DefaultAccount,qos%95 withassoc" # if user (parent is account holder)
-  cmd2="sacctmgr show account where name=\"${1}\" format=Org,qos%95"         # if account holder (parent is organization/department)
-  echo "# ${cmd1}"
-  $cmd1
-  echo "# ${cmd2}"
-  $cmd2
+    if [[ -z $1 ]]; then
+        echo "Usage: acct <login|account>"
+        echo " => get user/account holder"
+        return
+    fi
+    cmd1="sacctmgr show user where name=\"${1}\" format=user,account%20,DefaultAccount,qos%95 withassoc" # if user (parent is account holder)
+    cmd2="sacctmgr show account where name=\"${1}\" format=Org,qos%95"         # if account holder (parent is organization/department)
+    echo "# ${cmd1}"
+    $cmd1
+    echo "# ${cmd2}"
+    $cmd2
 }
 sassoc() {
-  local user=${1:-$(whoami)}
-  cmd="sacctmgr show association where users=$user format=cluster,account%20,user,share,qos%90,maxjobs,maxsubmit,maxtres,"
-  echo "# ${cmd}"
-  $cmd
+    local user=${1:-$(whoami)}
+    cmd="sacctmgr show association where users=$user format=cluster,account%20,user,share,qos%90,maxjobs,maxsubmit,maxtres,"
+    echo "# ${cmd}"
+    $cmd
 }
 
 ## Sprio helpers
