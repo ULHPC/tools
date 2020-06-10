@@ -1,4 +1,4 @@
-# Time-stamp: <Wed 2020-06-10 14:49 svarrette>
+# Time-stamp: <Wed 2020-06-10 14:54 svarrette>
 ################################################################################
 # [/etc/]profile.d/slurm.sh - Various Slurm helper functions and aliases to
 # .                           use on the UL HPC Platform (https://hpc.uni.lu)
@@ -189,7 +189,7 @@ pload() {
         #cpuused=$(echo $usage | cut -d '/' -f 1)
         cpufree=$(echo $usage | cut -d '/' -f 2)
         usageratio=$(echo "$cpuused*100/$cpumax" | bc -l)
-        [ "$partition" == "gpu" ] && gpustats=$(gpuload) || gpustats=""
+        [ "$p" == "gpu" ] && gpustats=$(gpuload) || gpustats=""
         #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
         printf "%12s %8s %9s %9s %10.1f%% %s\n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio" "$gpustats"
     done
