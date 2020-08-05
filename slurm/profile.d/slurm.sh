@@ -161,7 +161,7 @@ pload() {
     local partition=""
     while [ -n "$1" ]; do
         case $1 in
-            -a | --all) partition="interactive batch gpu bigmem";;
+            -a | --all) partition="interactive batch long gpu bigmem";;
             -h | --no-header) no_header=$1;;
             i  | int*) partition="interactive";;
             b  | bat*) partition="batch";;
@@ -231,7 +231,7 @@ qload() {
         echo -e " Options:\n   -a: show all qos"
         return
     fi
-    partitionlimits=$(sinfo -h --format=%P,%C)
+    partitionlimits=$(sinfo -h --format=%P,%C | grep -v admin)
     [ -z "$no_header" ] && \
         printf "%12s %16s %8s %9s %9s %12s %12s\n" "Partition" "QOS" "CPU Max" "CPU Used" "CPU Free" "Usage[%]" " "
     for pattern in $qos_list; do
