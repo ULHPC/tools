@@ -324,6 +324,14 @@ sassoc() {
     echo "# ${cmd}"
     $cmd
 }
+sqos() {
+    if [[ -n "$1" ]]; then
+        local filter="where name=$1"
+    fi 
+    cmd="sacctmgr show qos ${filter} format=\"name%20,preempt,priority,GrpTRES,MaxTresPerJob,MaxJobsPerUser,MaxWall,flags\""
+    echo "# ${cmd}"
+    $cmd
+}
 
 ## Sprio helpers
 alias sp='sprio'
