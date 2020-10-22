@@ -21,7 +21,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ################################################################################
 # Default formats
-export SQUEUE_FORMAT="%.18i %.9P %.15q %.8j %.20u %.4D %.5C %.2t %.12M %.12L %.8Q %R"
+export SQUEUE_FORMAT="%.10i %.9P %.10q %.8j %.20u %.4D %.5C %.2t %.12M %.12L %.8Q %R"
 
 ### Most useful format field for squeue (see man squeue)
 #   --format      --Format
@@ -77,29 +77,27 @@ slist(){
         seff $JOBID
     fi
 }
+alias sjobstats=slist
 
 function si {
     local options="$*"
-    cmd="srun -p interactive --qos qos-interactive $options --pty bash"
+    cmd="srun -p interactive --qos debug -C batch $options --pty bash"
     echo "# ${cmd}"
     $cmd
 }
-# interactive batch job for 30 min
-function sb {
+function si-gpu {
     local options="$*"
-    cmd="srun -p batch --qos qos-batch -t 0:30:00 $options --pty batch"
+    if [[ $options != *"-G"* ]]; then 
+        echo '# /!\ WARNING: append -G 1 to really reserve a GPU'
+        options="${options} -G 1"
+    fi 
+    cmd="srun -p interactive --qos debug -C gpu $options --pty bash"
     echo "# ${cmd}"
     $cmd
 }
-# interactive gpu job for 30 min
-function sgpu {
+function si-bigmem {
     local options="$*"
-    if [[ -z $1 ]]; then
-        echo "Usage: sb <#GPU> [...]"
-        echo " => interactive gpu job for 30 min with <#GPU> GPUs"
-        return
-    fi
-    cmd="srun -p gpu --qos qos-gpu -t 0:30:00 -G $options --pty batch"
+    cmd="srun -p interactive --qos debug -C bigmem $options --pty bash"
     echo "# ${cmd}"
     $cmd
 }
