@@ -149,6 +149,7 @@ gpuload() {
     #gpumax=$(sinfo -h -N -p gpu -o %G | cut -d : -f3 | paste -sd + | bc)
     gpumax=96
     gpuused=$(squeue -h -t R -p gpu -o "%b*%D" | grep gpu | cut -d , -f 1 | cut -d : -f 2 | sed 's/gpu/1/g'  | paste -sd '+' |bc)
+    [ -z "${gpuused}" ] && gpuused=0
     gpuusage=$(echo "$gpuused*100/$gpumax" | bc -l)
     printf "GPU: %s/%s (%2.1f%%)\n" "$gpuused" "$gpumax" "$gpuusage"
 }
@@ -159,11 +160,10 @@ pload() {
     local partition=""
     while [ -n "$1" ]; do
         case $1 in
-            -a | --all) partition="interactive batch long gpu bigmem";;
+            -a | --all) partition="batch gpu bigmem";;
             -h | --no-header) no_header=$1;;
             i  | int*) partition="interactive";;
             b  | bat*) partition="batch";;
-            l  | lon*) partition="long";;
             g  | gpu*) partition="gpu";;
             m  | big*) partition="bigmem";;
             *) echo "Unknown partition '$1'"; return;;
@@ -173,23 +173,33 @@ pload() {
     if [[ -z "$partition" ]]; then
         echo "Usage: pload [-a] [--no-header] <partition>"
         echo " => Show current load of the slurm partition <partition>, eventually without header"
-        echo "    <partition> shortcuts: i=interactive b=batch l=long g=gpu m=bigmem"
+        echo "    <partition> shortcuts: i=interactive b=batch g=gpu m=bigmem"
         echo -e " Options:\n   -a: show all partition"
         return
     fi
     [ -z "$no_header" ] && \
         printf "%12s %8s %9s %9s %12s\n" "Partition" "CPU Max" "CPU Used" "CPU Free" "Usage[%]"
     for p in $partition; do
-        usage=$(sinfo -h -p $p --format=%C)
-        cpumax=$(echo $usage | cut -d '/' -f 4)
-        # include other (draining, down)
-        cpuused=$(( $(echo $usage | cut -d '/' -f 1) + $(echo $usage | cut -d '/' -f 3) ))
-        #cpuused=$(echo $usage | cut -d '/' -f 1)
-        cpufree=$(echo $usage | cut -d '/' -f 2)
-        usageratio=$(echo "$cpuused*100/$cpumax" | bc -l)
-        [ "$p" == "gpu" ] && gpustats=$(gpuload) || gpustats=""
-        #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
-        printf "%12s %8s %9s %9s %10.1f%% %s\n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio" "$gpustats"
+        if [ "$p" == "interactive" ]; then 
+            cpumax="$(sacctmgr show qos where name=debug format=GrpTRES -n -P)"
+            cpuused=$(squeue --qos debug --format %C -h | paste -sd+ | bc)
+            cpufree='n/a'
+            usageratio='n/a'
+            printf "%12s %8s %9s %9s %10s%%\n" "($p)" "$cpumax" "$cpuused" "$cpufree" "$usageratio"
+    
+        else 
+            # allocated/idle/other/total
+            usage=$(sinfo -h -p $p --format=%C)
+            cpumax=$(echo $usage | cut -d '/' -f 4)
+            # include other (draining, down)
+            cpuused=$(( $(echo $usage | cut -d '/' -f 1) + $(echo $usage | cut -d '/' -f 3) ))
+            #cpuused=$(echo $usage | cut -d '/' -f 1)
+            cpufree=$(echo $usage | cut -d '/' -f 2)
+            usageratio=$(echo "$cpuused*100/$cpumax" | bc -l)
+            [ "$p" == "gpu" ] && gpustats=$(gpuload) || gpustats=""
+            #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
+            printf "%12s %8s %9s %9s %10.1f%% %s\n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio" "$gpustats"
+        fi 
     done
 }
 listpartitionjobs(){
