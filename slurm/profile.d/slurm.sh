@@ -239,48 +239,38 @@ qload() {
         echo -e " Options:\n   -a: show all qos"
         return
     fi
-    partitionlimits=$(sinfo -h --format=%P,%C | grep -v admin)
+    partitionlimits=$(sinfo -a -h --format=%P,%C)
+    allcpuamount=$(echo  "$partitionlimits" | grep "all" | awk -F '/' '{ print $4 }')
+    unavailablecpu=$(echo "$partitionlimits" | grep "all" | awk -F '/' '{ print $3 }')
+    [ "$unavailablecpu" -gt "0" ] && comment="(*) $unavailablecpu CPU unavailable" || comment=""
+    totalused=0
+
     [ -z "$no_header" ] && \
-        printf "%12s %16s %8s %9s %9s %12s %12s\n" "Partition" "QOS" "CPU Max" "CPU Used" "CPU Free" "Usage[%]" " "
+        printf "%16s %9s %12s %12s\n" "QOS" "CPU Used" "Usage[%]"
     for pattern in $qos_list; do
-        #echo "==> pattern '$pattern'"
         use_partition_stats=""
         case $pattern in
             besteffort | b* ) partition="all";         qos="besteffort"; q=$qos;;
             low        | l  ) partition="all";         qos="low";        q=$qos;;
             normal     | n* ) partition="all";         qos="normal";     q=$qos;;
             long       | g  ) partition="all";         qos="long";       q=$qos;;
-            debug      | d* ) partition="interactive"; qos="debug";      q=$qos; use_partition_stats=$pattern;;
+            debug      | d* ) partition="interactive"; qos="debug";      q=$qos;;
             high       | h* ) partition="all";         qos="high";       q=$qos;;
             urgent     | u* ) partition="all";         qos="urgent";     q=$qos;;
             *) echo "Unknown pattern '$pattern'"; return;;
         esac
-        qoscpumax=$(sacctmgr -n -P list qos format=grptres where name="$q" | sed '/|$/d;s/cpu=//g' | paste -sd '+' | bc)
-        [ -z "$qoscpumax" ] && qoscpumax=$(echo  "$partitionlimits" | grep $partition | awk -F '/' '{ print $4 }')
-        if [ -n "${use_partition_stats}" ]; then # aggregate partition stats
-            qoscpualloc=$(echo "$partitionlimits" | grep $partition | cut -d ',' -f 2 | awk -F '/' '{ print $1 }')
-            qoscpuother=$(echo "$partitionlimits" | grep $partition | awk -F '/' '{ print $3 }')
-        else
-            qoscpualloc=$(squeue -h --qos "$q" -t R -o %C | paste -sd '+' | bc)
-            [ -z "$qoscpualloc" ] && qoscpualloc=0
-            qoscpuother=0
-            [ "$qos" == 'qos-batch' ] && qoscpuother=$(echo "$partitionlimits" | grep $partition | awk -F '/' '{ print $3 }')
-        fi
-        [ "$qoscpuother" -gt "0" ] && comment="(*) $qoscpuother CPU unavailable" || comment=""
-        qoscpuused=$(echo "$qoscpualloc+$qoscpuother" | bc)
-        qoscpufree=$(echo "$qoscpumax-$qoscpuused"    | bc)
-        [ "${qoscpumax}" == "0" ] && qosusage=0 || qosusage=$(echo "$qoscpuused*100/$qoscpumax" | bc -l)
-        [ "$partition" == "gpu" ] && gpustats=$(gpuload) || gpustats="" # "$(echo "$partitionlimits" | grep $partition) (A/I/O/T) $qoscpualloc+$qoscpuother"
-        printf "%12s %16s %8s %9s %9s %10.1f%% %12s\n" "$partition" "$qos" "$qoscpumax" "$qoscpuused" "$qoscpufree" "$qosusage" "$gpustats $comment"
+        qoscpualloc=$(squeue -h --qos "$q" -t R -o %C | paste -sd '+' | bc)
+        [ -z "$qoscpualloc" ] && qoscpualloc=0
+        totalused=$((totalused+qoscpualloc))
+
+        [ "${allcpuamount}" == "0" ] && qosusage=0 || qosusage=$(echo "$qoscpualloc*100/$allcpuamount" | bc -l)
+
+        printf "%16s %9s %10.1f%% %12s\n" "$qos" "$qoscpualloc" "$qosusage"
     done
-    printf "%29s -------- --------- --------- -----------\n" " "
+    printf "%16s --------- -----------\n" " "
     if [ -n "$show_all" ]; then
-        #total=$(sinfo -h --format=%C)
-        totalmax=$(echo  "$partitionlimits" | awk -F '/' '{ print $4 }' | paste -sd '+' | bc)
-        totalused=$(echo "$partitionlimits" | cut -d ',' -f 2 | awk -F '/' '{ print $1+$3 }' | paste -sd '+' | bc)
-        totalfree=$(echo  "$totalmax-$totalused" | bc)
-        totalusage=$(echo "$totalused*100/$totalmax" | bc -l)
-        printf "%29s %8s %9s %9s %9.1f%%\n" "TOTAL:" "$totalmax" "$totalused" "$totalfree" "$totalusage"
+        totalusage=$(echo "$totalused*100/$allcpuamount" | bc -l)
+        printf "%16s %9s %9.1f%%\n" "TOTAL:" "$totalused/$allcpuamount" "$totalusage"
     fi
 }
 alias irisqosusage='qload -a'
