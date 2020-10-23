@@ -332,6 +332,7 @@ sqos() {
     echo "# ${cmd}"
     $cmd
 }
+alias showqos=sqos
 
 ## Sprio helpers
 alias sp='sprio'
