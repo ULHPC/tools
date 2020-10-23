@@ -226,7 +226,7 @@ qload() {
     local show_all=""
     while [ -n "$1" ]; do
         case $1 in
-            -a | --all) show_all=$1; qos_list="interactive qos-batch dedicated industry long gpu bigmem";;
+            -a | --all) show_all=$1; qos_list="besteffort low normal long debug high urgent";;
             -h | --no-header) no_header=$1;;
             *) qos_list=$*; break;;
         esac
@@ -235,7 +235,7 @@ qload() {
     if [[ -z "$qos_list" ]]; then
         echo "Usage: qload [-a] [--no-header] <qos>"
         echo " => Show current load of the slurm QOS <qos>, eventually without header"
-        echo "    <qos> shortcuts: i=interactive b=batch l=long g=gpu m=bigmem"
+        echo "    <qos> shortcuts: b=besteffort l=low n=normal g=long d=debug h=high u=urgent"
         echo -e " Options:\n   -a: show all qos"
         return
     fi
@@ -246,21 +246,17 @@ qload() {
         #echo "==> pattern '$pattern'"
         use_partition_stats=""
         case $pattern in
-            qos-interactive | i | int*) partition="interactive"; qos="qos-${partition}"; q=$qos; use_partition_stats=$pattern;;
-            qos-batch)                  partition="batch";       qos="qos-${partition}"; q=$qos;;
-            qos-long        | l | lon*) partition="long";        qos="qos-${partition}"; q=$qos; use_partition_stats=$pattern;;
-            qos-gpu         | g | gpu*) partition="gpu";         qos="qos-${partition}"; q=$qos; use_partition_stats=$pattern;;
-            qos-bigmem      | m | big*) partition="bigmem";      qos="qos-${partition}"; q=$qos; use_partition_stats=$pattern;;
-            qos-batch-001)              partition="batch";       qos="${pattern}";       q=$qos;;
-            qos-batch-00*)              partition="batch";       qos="(industry)";       q=$pattern;;
-            d | ded*)                   partition="batch";       qos="(dedicated)";      q="qos-batch-001,qos-covid";;
-            ind*)                       partition="batch";       qos="(industry)";       q="qos-batch-002,qos-batch-003";;
-            b | bat*)                   partition="batch";       qos="qos-batch-*";      q="qos-batch,qos-batch-001,qos-covid,qos-batch-002,qos-batch-003"; use_partition_stats=$pattern;;
-            qos-covid | cov*)           partition="batch";       qos="qos-covid";        q=$qos;;
+            besteffort | b* ) partition="all";         qos="besteffort"; q=$qos;;
+            low        | l  ) partition="all";         qos="low";        q=$qos;;
+            normal     | n* ) partition="all";         qos="normal";     q=$qos;;
+            long       | g  ) partition="all";         qos="long";       q=$qos;;
+            debug      | d* ) partition="interactive"; qos="debug";      q=$qos; use_partition_stats=$pattern;;
+            high       | h* ) partition="all";         qos="high";       q=$qos;;
+            urgent     | u* ) partition="all";         qos="urgent";     q=$qos;;
             *) echo "Unknown pattern '$pattern'"; return;;
         esac
         qoscpumax=$(sacctmgr -n -P list qos format=grptres where name="$q" | sed '/|$/d;s/cpu=//g' | paste -sd '+' | bc)
-        [ -z "$qoscpumax" ]  && qoscpumax=$(echo  "$partitionlimits" | grep $partition | awk -F '/' '{ print $4 }')
+        [ -z "$qoscpumax" ] && qoscpumax=$(echo  "$partitionlimits" | grep $partition | awk -F '/' '{ print $4 }')
         if [ -n "${use_partition_stats}" ]; then # aggregate partition stats
             qoscpualloc=$(echo "$partitionlimits" | grep $partition | cut -d ',' -f 2 | awk -F '/' '{ print $1 }')
             qoscpuother=$(echo "$partitionlimits" | grep $partition | awk -F '/' '{ print $3 }')
