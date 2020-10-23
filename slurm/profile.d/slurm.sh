@@ -148,7 +148,7 @@ alias sissues='sinfo -R -o "%45E %19H %6t %N"'
 gpuload() {
     #gpumax=$(sinfo -h -N -p gpu -o %G | cut -d : -f3 | paste -sd + | bc)
     gpumax=96
-    gpuused=$(squeue -h -t R -p gpu -o "%b*%D" | grep gpu | cut -d , -f 1 | cut -d : -f 2 | sed 's/gpu/1/g'  | paste -sd '+' |bc)
+    gpuused=$(sacct -n -s R -a -X --format=Reqgres | grep gpu | cut -d : -f 2 | paste -sd '+' | bc);
     [ -z "${gpuused}" ] && gpuused=0
     gpuusage=$(echo "$gpuused*100/$gpumax" | bc -l)
     printf "GPU: %s/%s (%2.1f%%)\n" "$gpuused" "$gpumax" "$gpuusage"
