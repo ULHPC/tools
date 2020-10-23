@@ -21,7 +21,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ################################################################################
 # Default formats
-export SQUEUE_FORMAT="%.18i %.9P %.15q %.8j %.20u %.4D %.5C %.2t %.12M %.12L %.8Q %R"
+export SQUEUE_FORMAT="%.10i %.9P %.10q %.8j %.20u %.4D %.5C %.2t %.12M %.12L %.8Q %R"
 
 ### Most useful format field for squeue (see man squeue)
 #   --format      --Format
@@ -77,29 +77,27 @@ slist(){
         seff $JOBID
     fi
 }
+alias sjobstats=slist
 
 function si {
     local options="$*"
-    cmd="srun -p interactive --qos qos-interactive $options --pty bash"
+    cmd="srun -p interactive --qos debug -C batch $options --pty bash"
     echo "# ${cmd}"
     $cmd
 }
-# interactive batch job for 30 min
-function sb {
+function si-gpu {
     local options="$*"
-    cmd="srun -p batch --qos qos-batch -t 0:30:00 $options --pty batch"
+    if [[ $options != *"-G"* ]]; then 
+        echo '# /!\ WARNING: append -G 1 to really reserve a GPU'
+        options="${options} -G 1"
+    fi 
+    cmd="srun -p interactive --qos debug -C gpu $options --pty bash"
     echo "# ${cmd}"
     $cmd
 }
-# interactive gpu job for 30 min
-function sgpu {
+function si-bigmem {
     local options="$*"
-    if [[ -z $1 ]]; then
-        echo "Usage: sb <#GPU> [...]"
-        echo " => interactive gpu job for 30 min with <#GPU> GPUs"
-        return
-    fi
-    cmd="srun -p gpu --qos qos-gpu -t 0:30:00 -G $options --pty batch"
+    cmd="srun -p interactive --qos debug -C bigmem $options --pty bash"
     echo "# ${cmd}"
     $cmd
 }
@@ -151,6 +149,7 @@ gpuload() {
     #gpumax=$(sinfo -h -N -p gpu -o %G | cut -d : -f3 | paste -sd + | bc)
     gpumax=96
     gpuused=$(squeue -h -t R -p gpu -o "%b*%D" | grep gpu | cut -d , -f 1 | cut -d : -f 2 | sed 's/gpu/1/g'  | paste -sd '+' |bc)
+    [ -z "${gpuused}" ] && gpuused=0
     gpuusage=$(echo "$gpuused*100/$gpumax" | bc -l)
     printf "GPU: %s/%s (%2.1f%%)\n" "$gpuused" "$gpumax" "$gpuusage"
 }
@@ -161,11 +160,10 @@ pload() {
     local partition=""
     while [ -n "$1" ]; do
         case $1 in
-            -a | --all) partition="interactive batch long gpu bigmem";;
+            -a | --all) partition="batch gpu bigmem";;
             -h | --no-header) no_header=$1;;
             i  | int*) partition="interactive";;
             b  | bat*) partition="batch";;
-            l  | lon*) partition="long";;
             g  | gpu*) partition="gpu";;
             m  | big*) partition="bigmem";;
             *) echo "Unknown partition '$1'"; return;;
@@ -175,23 +173,33 @@ pload() {
     if [[ -z "$partition" ]]; then
         echo "Usage: pload [-a] [--no-header] <partition>"
         echo " => Show current load of the slurm partition <partition>, eventually without header"
-        echo "    <partition> shortcuts: i=interactive b=batch l=long g=gpu m=bigmem"
+        echo "    <partition> shortcuts: i=interactive b=batch g=gpu m=bigmem"
         echo -e " Options:\n   -a: show all partition"
         return
     fi
     [ -z "$no_header" ] && \
         printf "%12s %8s %9s %9s %12s\n" "Partition" "CPU Max" "CPU Used" "CPU Free" "Usage[%]"
     for p in $partition; do
-        usage=$(sinfo -h -p $p --format=%C)
-        cpumax=$(echo $usage | cut -d '/' -f 4)
-        # include other (draining, down)
-        cpuused=$(( $(echo $usage | cut -d '/' -f 1) + $(echo $usage | cut -d '/' -f 3) ))
-        #cpuused=$(echo $usage | cut -d '/' -f 1)
-        cpufree=$(echo $usage | cut -d '/' -f 2)
-        usageratio=$(echo "$cpuused*100/$cpumax" | bc -l)
-        [ "$p" == "gpu" ] && gpustats=$(gpuload) || gpustats=""
-        #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
-        printf "%12s %8s %9s %9s %10.1f%% %s\n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio" "$gpustats"
+        if [ "$p" == "interactive" ]; then 
+            cpumax="$(sacctmgr show qos where name=debug format=GrpTRES -n -P)"
+            cpuused=$(squeue --qos debug --format %C -h | paste -sd+ | bc)
+            cpufree='n/a'
+            usageratio='n/a'
+            printf "%12s %8s %9s %9s %10s%%\n" "($p)" "$cpumax" "$cpuused" "$cpufree" "$usageratio"
+    
+        else 
+            # allocated/idle/other/total
+            usage=$(sinfo -h -p $p --format=%C)
+            cpumax=$(echo $usage | cut -d '/' -f 4)
+            # include other (draining, down)
+            cpuused=$(( $(echo $usage | cut -d '/' -f 1) + $(echo $usage | cut -d '/' -f 3) ))
+            #cpuused=$(echo $usage | cut -d '/' -f 1)
+            cpufree=$(echo $usage | cut -d '/' -f 2)
+            usageratio=$(echo "$cpuused*100/$cpumax" | bc -l)
+            [ "$p" == "gpu" ] && gpustats=$(gpuload) || gpustats=""
+            #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
+            printf "%12s %8s %9s %9s %10.1f%% %s\n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio" "$gpustats"
+        fi 
     done
 }
 listpartitionjobs(){
@@ -316,6 +324,15 @@ sassoc() {
     echo "# ${cmd}"
     $cmd
 }
+sqos() {
+    if [[ -n "$1" ]]; then
+        local filter="where name=$1"
+    fi 
+    cmd="sacctmgr show qos ${filter} format=\"name%20,preempt,priority,GrpTRES,MaxTresPerJob,MaxJobsPerUser,MaxWall,flags\""
+    echo "# ${cmd}"
+    $cmd
+}
+alias showqos=sqos
 
 ## Sprio helpers
 alias sp='sprio'
