@@ -282,7 +282,11 @@ alias qosusagegpu='qload g'
 
 irisstat(){
     sinfo -h --format=%C | awk -F '/' '{printf "Utilization: %.2f%%\n", $1/$4*100}'
+    printf "\n"
+    pload -a
+    printf "\n"
     qload -a
+    printf "\n"
     echo "Drained nodes: $(sinfo -h -t drain -o '%D')"
     printf "%0.s-" {1..50} ; printf "\n"
     printf "Jobs status: \n"
