@@ -21,7 +21,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ################################################################################
 # Default formats
-export SQUEUE_FORMAT="%.10i %.9P %.10q %.8j %.20u %.4D %.5C %.2t %.12M %.12L %.8Q %R"
+export SQUEUE_FORMAT="%.8i %.6P %.9q %.20j %.10u %.4D %.5C %.2t %.12M %.12L %.8Q %R"
 
 ### Most useful format field for squeue (see man squeue)
 #   --format      --Format
@@ -87,10 +87,10 @@ function si {
 }
 function si-gpu {
     local options="$*"
-    if [[ $options != *"-G"* ]]; then 
+    if [[ $options != *"-G"* ]]; then
         echo '# /!\ WARNING: append -G 1 to really reserve a GPU'
         options="${options} -G 1"
-    fi 
+    fi
     cmd="srun -p interactive --qos debug -C gpu $options --pty bash"
     echo "# ${cmd}"
     $cmd
@@ -180,14 +180,14 @@ pload() {
     [ -z "$no_header" ] && \
         printf "%12s %8s %9s %9s %12s\n" "Partition" "CPU Max" "CPU Used" "CPU Free" "Usage[%]"
     for p in $partition; do
-        if [ "$p" == "interactive" ]; then 
+        if [ "$p" == "interactive" ]; then
             cpumax="$(sacctmgr show qos where name=debug format=GrpTRES -n -P)"
             cpuused=$(squeue --qos debug --format %C -h | paste -sd+ | bc)
             cpufree='n/a'
             usageratio='n/a'
             printf "%12s %8s %9s %9s %10s%%\n" "($p)" "$cpumax" "$cpuused" "$cpufree" "$usageratio"
-    
-        else 
+
+        else
             # allocated/idle/other/total
             usage=$(sinfo -h -p $p --format=%C)
             cpumax=$(echo $usage | cut -d '/' -f 4)
@@ -199,7 +199,7 @@ pload() {
             [ "$p" == "gpu" ] && gpustats=$(gpuload) || gpustats=""
             #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
             printf "%12s %8s %9s %9s %10.1f%% %s\n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio" "$gpustats"
-        fi 
+        fi
     done
 }
 listpartitionjobs(){
@@ -317,7 +317,7 @@ sassoc() {
 sqos() {
     if [[ -n "$1" ]]; then
         local filter="where name=$1"
-    fi 
+    fi
     cmd="sacctmgr show qos ${filter} format=\"name%20,preempt,priority,GrpTRES,MaxTresPerJob,MaxJobsPerUser,MaxWall,flags\""
     echo "# ${cmd}"
     $cmd
