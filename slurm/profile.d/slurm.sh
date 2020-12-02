@@ -42,12 +42,25 @@ export SQUEUE_FORMAT="%.8i %.6P %.9q %.20j %.10u %.4D %.5C %.2t %.12M %.12L %.8Q
 # | %M         | TimeUsed     | Time used by the job:  days-hours:minutes:seconds  |
 # | %L         | TimeLeft     | Time left for the job: days-hours:minutes:seconds. |
 
+# export SPRIO_FORMAT="%.15i %9r %.8u %.10Y %.10A %.10F %.10P %.10Q"
+# USE 'sprio -w' to see current weights
+### Most useful format field for sprio (see man sprio)
+#   --format    
+# | Short (-o) | Description                                        |
+# |------------|----------------------------------------------------|
+# | %i         | Job ID                                             |
+# | %r         | Partition name                                     |
+# | %u         | User name for a job                                |
+# | %Y         | Job priority                                       |
+# | %A         | Weighted age priority                              |
+# | %F         | Weighted fair-share priority                       | 
+# | %P         | Weighted partition priority                        |
+# | %Q         | Weighted quality of service priority               |
 
 ## SLURM helpers
 
 ## scontrol helpers
 alias ssj='scontrol show job'
-
 
 ## [srun] job helpers
 sjoin(){
