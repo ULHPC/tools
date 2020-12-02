@@ -21,7 +21,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ################################################################################
 # Default formats
-export SQUEUE_FORMAT="%.10i %.9P %.10q %.8j %.20u %.4D %.5C %.2t %.12M %.12L %.8Q %R"
+export SQUEUE_FORMAT="%.8i %.6P %.9q %.20j %.10u %.4D %.5C %.2t %.12M %.12L %.8Q %R"
 
 ### Most useful format field for squeue (see man squeue)
 #   --format      --Format
@@ -42,12 +42,25 @@ export SQUEUE_FORMAT="%.10i %.9P %.10q %.8j %.20u %.4D %.5C %.2t %.12M %.12L %.8
 # | %M         | TimeUsed     | Time used by the job:  days-hours:minutes:seconds  |
 # | %L         | TimeLeft     | Time left for the job: days-hours:minutes:seconds. |
 
+# export SPRIO_FORMAT="%.15i %9r %.8u %.10Y %.10A %.10F %.10P %.10Q"
+# USE 'sprio -w' to see current weights
+### Most useful format field for sprio (see man sprio)
+#   --format    
+# | Short (-o) | Description                                        |
+# |------------|----------------------------------------------------|
+# | %i         | Job ID                                             |
+# | %r         | Partition name                                     |
+# | %u         | User name for a job                                |
+# | %Y         | Job priority                                       |
+# | %A         | Weighted age priority                              |
+# | %F         | Weighted fair-share priority                       | 
+# | %P         | Weighted partition priority                        |
+# | %Q         | Weighted quality of service priority               |
 
 ## SLURM helpers
 
 ## scontrol helpers
 alias ssj='scontrol show job'
-
 
 ## [srun] job helpers
 sjoin(){
@@ -78,25 +91,37 @@ slist(){
     fi
 }
 alias sjobstats=slist
+# Current job info 
+alias scurrent="scontrol show job $SLURM_JOBID"
+
 
 function si {
     local options="$*"
+    if [[ $options != *"--mem"* ]]; then
+        options="${options} --mem-per-cpu 4096"
+    fi  
     cmd="srun -p interactive --qos debug -C batch $options --pty bash"
     echo "# ${cmd}"
     $cmd
 }
 function si-gpu {
     local options="$*"
-    if [[ $options != *"-G"* ]]; then 
+    if [[ $options != *"-G"* ]]; then
         echo '# /!\ WARNING: append -G 1 to really reserve a GPU'
         options="${options} -G 1"
-    fi 
+    fi
+    if [[ $options != *"--mem"* ]]; then
+        options="${options} --mem-per-cpu 27000"
+    fi  
     cmd="srun -p interactive --qos debug -C gpu $options --pty bash"
     echo "# ${cmd}"
     $cmd
 }
 function si-bigmem {
     local options="$*"
+    if [[ $options != *"--mem"* ]]; then
+        options="${options} --mem-per-cpu 27000"
+    fi  
     cmd="srun -p interactive --qos debug -C bigmem $options --pty bash"
     echo "# ${cmd}"
     $cmd
@@ -180,14 +205,14 @@ pload() {
     [ -z "$no_header" ] && \
         printf "%12s %8s %9s %9s %12s\n" "Partition" "CPU Max" "CPU Used" "CPU Free" "Usage[%]"
     for p in $partition; do
-        if [ "$p" == "interactive" ]; then 
+        if [ "$p" == "interactive" ]; then
             cpumax="$(sacctmgr show qos where name=debug format=GrpTRES -n -P)"
             cpuused=$(squeue --qos debug --format %C -h | paste -sd+ | bc)
             cpufree='n/a'
             usageratio='n/a'
             printf "%12s %8s %9s %9s %10s%%\n" "($p)" "$cpumax" "$cpuused" "$cpufree" "$usageratio"
-    
-        else 
+
+        else
             # allocated/idle/other/total
             usage=$(sinfo -h -p $p --format=%C)
             cpumax=$(echo $usage | cut -d '/' -f 4)
@@ -199,7 +224,7 @@ pload() {
             [ "$p" == "gpu" ] && gpustats=$(gpuload) || gpustats=""
             #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
             printf "%12s %8s %9s %9s %10.1f%% %s\n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio" "$gpustats"
-        fi 
+        fi
     done
 }
 listpartitionjobs(){
@@ -317,7 +342,7 @@ sassoc() {
 sqos() {
     if [[ -n "$1" ]]; then
         local filter="where name=$1"
-    fi 
+    fi
     cmd="sacctmgr show qos ${filter} format=\"name%20,preempt,priority,GrpTRES,MaxTresPerJob,MaxJobsPerUser,MaxWall,flags\""
     echo "# ${cmd}"
     $cmd
@@ -327,3 +352,33 @@ alias showqos=sqos
 ## Sprio helpers
 alias sp='sprio'
 alias spl='sprio -l'
+
+susage() {
+    local start=$(date +%F)
+    local end=$(date +%F)
+    local part="batch,gpu,bigmem"
+    local options=""
+    while [ -n "$1" ]; do
+        case $1 in
+            -S | --start) shift; start=$1;;
+            -E | --end)   shift; end=$1;;
+            -m | -M | --month) start="$(date +%Y-%m)-01";;
+            -y | -Y | --year)  start="$(date +%Y)-01-01";;
+            -p | --partition)  shift; part=$1;;  
+            -h | --help) 
+                echo "Usage: susage [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD]";
+                echo "Display past job usage summary"
+                return;;
+            *) options=$*; break;;
+        esac
+        shift
+    done
+    cmd="sacct -X -S ${start} -E ${end} ${options} --format User,JobID,partition%12,state,time,elapsed,nnodes,ncpus,nodelist"
+    echo "# ${cmd}"
+    ${cmd}
+    echo
+    echo "### Statistics on '${part}' partition(s)"
+    cmd="sacct -X -S ${start} -E ${end} --partition ${part} --format state --noheader -P"
+    echo "# ${cmd} | sort | uniq -c"
+    ${cmd} | sort | uniq -c
+}
