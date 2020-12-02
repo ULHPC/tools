@@ -352,3 +352,33 @@ alias showqos=sqos
 ## Sprio helpers
 alias sp='sprio'
 alias spl='sprio -l'
+
+susage() {
+    local start=$(date +%F)
+    local end=$(date +%F)
+    local part="batch,gpu,bigmem"
+    local options=""
+    while [ -n "$1" ]; do
+        case $1 in
+            -S | --start) shift; start=$1;;
+            -E | --end)   shift; end=$1;;
+            -m | -M | --month) start="$(date +%Y-%m)-01";;
+            -y | -Y | --year)  start="$(date +%Y)-01-01";;
+            -p | --partition)  shift; part=$1;;  
+            -h | --help) 
+                echo "Usage: susage [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD]";
+                echo "Display past job usage summary"
+                return;;
+            *) options=$*; break;;
+        esac
+        shift
+    done
+    cmd="sacct -X -S ${start} -E ${end} ${options} --format User,JobID,partition%12,state,time,elapsed,nnodes,ncpus,nodelist"
+    echo "# ${cmd}"
+    ${cmd}
+    echo
+    echo "### Statistics on '${part}' partition(s)"
+    cmd="sacct -X -S ${start} -E ${end} --partition ${part} --format state --noheader -P"
+    echo "# ${cmd} | sort | uniq -c"
+    ${cmd} | sort | uniq -c
+}
