@@ -168,6 +168,13 @@ alias allocnodes='sinfo -h -t mix,alloc -o %N'
 alias idlenodes='sinfo -h -t idle -o %N'
 alias deadnodes='sinfo -d'
 alias sissues='sinfo -R -o "%45E %19H %6t %N"'
+sfeatures() {
+    local options="$*"
+    cmd="sinfo ${options} -o '%20N %.6D %.6c %15F %12P %f'"
+    echo "# ${cmd}"
+    eval ${cmd}
+}
+
 
 ## Utilization Report
 gpuload() {
