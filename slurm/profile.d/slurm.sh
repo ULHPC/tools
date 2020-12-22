@@ -97,9 +97,9 @@ alias scurrent="scontrol show job $SLURM_JOBID"
 
 function si {
     local options="$*"
-    if [[ $options != *"--mem"* ]]; then
-        options="${options} --mem-per-cpu 4096"
-    fi  
+    # if [[ $options != *"--mem"* ]]; then
+    #     options="${options} --mem-per-cpu 4096"
+    # fi  
     cmd="srun -p interactive --qos debug -C batch $options --pty bash"
     echo "# ${cmd}"
     $cmd
@@ -110,18 +110,18 @@ function si-gpu {
         echo '# /!\ WARNING: append -G 1 to really reserve a GPU'
         options="${options} -G 1"
     fi
-    if [[ $options != *"--mem"* ]]; then
-        options="${options} --mem-per-cpu 27000"
-    fi  
+    # if [[ $options != *"--mem"* ]]; then
+    #     options="${options} --mem-per-cpu 27000"
+    # fi  
     cmd="srun -p interactive --qos debug -C gpu $options --pty bash"
     echo "# ${cmd}"
     $cmd
 }
 function si-bigmem {
     local options="$*"
-    if [[ $options != *"--mem"* ]]; then
-        options="${options} --mem-per-cpu 27000"
-    fi  
+    # if [[ $options != *"--mem"* ]]; then
+    #     options="${options} --mem-per-cpu 27000"
+    # fi  
     cmd="srun -p interactive --qos debug -C bigmem $options --pty bash"
     echo "# ${cmd}"
     $cmd
