@@ -373,7 +373,8 @@ susage() {
             -y | -Y | --year)  start="$(date +%Y)-01-01";;
             -p | --partition)  shift; part=$1;;  
             -h | --help) 
-                echo "Usage: susage [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD]";
+                echo "Usage: susage [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD] ";
+                echo "  For a specific user (if accounting rights granted): susage [...] -u <user>";
                 echo "Display past job usage summary"
                 return;;
             *) options=$*; break;;
@@ -385,7 +386,7 @@ susage() {
     ${cmd}
     echo
     echo "### Statistics on '${part}' partition(s)"
-    cmd="sacct -X -S ${start} -E ${end} --partition ${part} --format state --noheader -P"
+    cmd="sacct -X -S ${start} -E ${end} ${options} --partition ${part} --format state --noheader -P"
     echo "# ${cmd} | sort | uniq -c"
     ${cmd} | sort | uniq -c
 }
