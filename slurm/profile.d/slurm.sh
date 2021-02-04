@@ -1,4 +1,4 @@
-# Time-stamp: <Wed 2020-06-10 15:00 svarrette>
+# Time-stamp: <Thu 2021-02-04 09:03 svarrette>
 ################################################################################
 # [/etc/]profile.d/slurm.sh - Various Slurm helper functions and aliases to
 # .                           use on the UL HPC Platform (https://hpc.uni.lu)
@@ -45,7 +45,7 @@ export SQUEUE_FORMAT="%.8i %.6P %.9q %.20j %.10u %.4D %.5C %.2t %.12M %.12L %.8Q
 # export SPRIO_FORMAT="%.15i %9r %.8u %.10Y %.10A %.10F %.10P %.10Q"
 # USE 'sprio -w' to see current weights
 ### Most useful format field for sprio (see man sprio)
-#   --format    
+#   --format
 # | Short (-o) | Description                                        |
 # |------------|----------------------------------------------------|
 # | %i         | Job ID                                             |
@@ -53,7 +53,7 @@ export SQUEUE_FORMAT="%.8i %.6P %.9q %.20j %.10u %.4D %.5C %.2t %.12M %.12L %.8Q
 # | %u         | User name for a job                                |
 # | %Y         | Job priority                                       |
 # | %A         | Weighted age priority                              |
-# | %F         | Weighted fair-share priority                       | 
+# | %F         | Weighted fair-share priority                       |
 # | %P         | Weighted partition priority                        |
 # | %Q         | Weighted quality of service priority               |
 
@@ -91,7 +91,7 @@ slist(){
     fi
 }
 alias sjobstats=slist
-# Current job info 
+# Current job info
 alias scurrent="scontrol show job $SLURM_JOBID"
 
 
@@ -99,7 +99,7 @@ function si {
     local options="$*"
     # if [[ $options != *"--mem"* ]]; then
     #     options="${options} --mem-per-cpu 4096"
-    # fi  
+    # fi
     cmd="srun -p interactive --qos debug -C batch $options --pty bash"
     echo "# ${cmd}"
     $cmd
@@ -112,7 +112,7 @@ function si-gpu {
     fi
     # if [[ $options != *"--mem"* ]]; then
     #     options="${options} --mem-per-cpu 27000"
-    # fi  
+    # fi
     cmd="srun -p interactive --qos debug -C gpu $options --pty bash"
     echo "# ${cmd}"
     $cmd
@@ -121,7 +121,7 @@ function si-bigmem {
     local options="$*"
     # if [[ $options != *"--mem"* ]]; then
     #     options="${options} --mem-per-cpu 27000"
-    # fi  
+    # fi
     cmd="srun -p interactive --qos debug -C bigmem $options --pty bash"
     echo "# ${cmd}"
     $cmd
@@ -333,16 +333,27 @@ acct(){
         echo " => get user/account holder"
         return
     fi
-    cmd1="sacctmgr show user where name=\"${1}\" format=user,account%20,DefaultAccount,qos%95 withassoc" # if user (parent is account holder)
-    cmd2="sacctmgr show account where name=\"${1}\" format=Org,qos%95"         # if account holder (parent is organization/department)
+    cmd1="sacctmgr show user where name=\"${1}\" format=user,account%20,DefaultAccount%20,qos%50 withassoc" # if user (parent is account holder)
+    cmd2="sacctmgr show account where name=\"${1}\" format=Org,account,descr%100"                 # if account holder (parent is organization/department)
     echo "# ${cmd1}"
-    $cmd1
-    echo "# ${cmd2}"
-    $cmd2
+    if [ -n "$($cmd1 -n -P)" ]; then
+        $cmd1
+        echo
+        echo "# ==> $1 Default account: $(sacctmgr show user where name=\"${1}\" format=DefaultAccount -P -n)"
+    else
+        echo "'$1' does not seem to be an end user. Searching for account attributes."
+        echo "# ${cmd2}"
+        echo "# Note: Org denote the parent account"
+        $cmd2
+    fi
 }
 sassoc() {
     local user=${1:-$(whoami)}
-    cmd="sacctmgr show association where users=$user format=cluster,account%20,user,share,qos%90,maxjobs,maxsubmit,maxtres,"
+    cmd="sacctmgr show association where users=$user format=cluster,account%20,user,share,qos%50,maxjobs,maxsubmit,maxtres,"
+    echo "# ${cmd}"
+    $cmd
+    echo "# Default account: "
+    cmd="sacctmgr show user where name=\"${1}\" format=DefaultAccount -P -n"
     echo "# ${cmd}"
     $cmd
 }
@@ -371,8 +382,8 @@ susage() {
             -E | --end)   shift; end=$1;;
             -m | -M | --month) start="$(date +%Y-%m)-01";;
             -y | -Y | --year)  start="$(date +%Y)-01-01";;
-            -p | --partition)  shift; part=$1;;  
-            -h | --help) 
+            -p | --partition)  shift; part=$1;;
+            -h | --help)
                 echo "Usage: susage [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD] ";
                 echo "  For a specific user (if accounting rights granted): susage [...] -u <user>";
                 echo "Display past job usage summary"
