@@ -1,4 +1,4 @@
-# Time-stamp: <Thu 2021-02-04 13:41 svarrette>
+# Time-stamp: <Thu 2021-02-04 13:50 svarrette>
 ################################################################################
 # [/etc/]profile.d/slurm.sh - Various Slurm helper functions and aliases to
 # .                           use on the UL HPC Platform (https://hpc.uni.lu)
@@ -365,6 +365,9 @@ sassoc() {
     else
         cmd="sacctmgr show association where accounts=$user format=cluster,account%20,user,share,qos%50,maxjobs,maxsubmit,maxtres"
         echo "# ${cmd}"
+        ${cmd}
+        cmd="sacctmgr show association where parent=$user format=cluster,account%20,share,qos%50,maxjobs,maxsubmit,maxtres"
+        echo "# Child account of ${1}: ${cmd}"
         ${cmd}
     fi
 }
