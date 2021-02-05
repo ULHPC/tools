@@ -1,4 +1,4 @@
-# Time-stamp: <Thu 2021-02-04 09:03 svarrette>
+# Time-stamp: <Thu 2021-02-04 13:50 svarrette>
 ################################################################################
 # [/etc/]profile.d/slurm.sh - Various Slurm helper functions and aliases to
 # .                           use on the UL HPC Platform (https://hpc.uni.lu)
@@ -333,8 +333,8 @@ acct(){
         echo " => get user/account holder"
         return
     fi
-    cmd1="sacctmgr show user where name=\"${1}\" format=user,account%20,DefaultAccount%20,qos%50 withassoc" # if user (parent is account holder)
-    cmd2="sacctmgr show account where name=\"${1}\" format=Org,account,descr%100"                 # if account holder (parent is organization/department)
+    cmd1="sacctmgr show user where name=\"${1}\" format=user,account%20,DefaultAccount%20,share,qos%50 withassoc" # if user (parent is account holder)
+    cmd2="sacctmgr show account where name=\"${1}\" format=Org,account%20,descr%100"   # if account holder (parent is organization/department)
     echo "# ${cmd1}"
     if [ -n "$($cmd1 -n -P)" ]; then
         $cmd1
@@ -345,17 +345,31 @@ acct(){
         echo "# ${cmd2}"
         echo "# Note: Org denote the parent account"
         $cmd2
+        echo
+        echo "=> check associated users to the '$1' account"
+        cmd="sacctmgr show association where accounts=\"${1}\" format=account%20,user,qos%50 withsubaccounts"
+        echo "# ${cmd}"
+        ${cmd}
     fi
 }
 sassoc() {
     local user=${1:-$(whoami)}
     cmd="sacctmgr show association where users=$user format=cluster,account%20,user,share,qos%50,maxjobs,maxsubmit,maxtres,"
-    echo "# ${cmd}"
-    $cmd
-    echo "# Default account: "
-    cmd="sacctmgr show user where name=\"${1}\" format=DefaultAccount -P -n"
-    echo "# ${cmd}"
-    $cmd
+    if [ -n "$($cmd -n -P)" ]; then
+        echo "# ${cmd}"
+        $cmd
+        echo "# Default account: "
+        cmd="sacctmgr show user where name=\"${1}\" format=DefaultAccount -P -n"
+        echo "# ${cmd}"
+        $cmd
+    else
+        cmd="sacctmgr show association where accounts=$user format=cluster,account%20,user,share,qos%50,maxjobs,maxsubmit,maxtres"
+        echo "# ${cmd}"
+        ${cmd}
+        cmd="sacctmgr show association where parent=$user format=cluster,account%20,share,qos%50,maxjobs,maxsubmit,maxtres"
+        echo "# Child account of ${1}: ${cmd}"
+        ${cmd}
+    fi
 }
 sqos() {
     if [[ -n "$1" ]]; then
