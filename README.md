@@ -8,7 +8,7 @@
          \____/|______|_|  |_|_|     \_____|    |_|\___/ \___/|_|___/ | |_____/|_|\__,_|_|  |_| |_| |_|  \___|\__\___(_) |
                                                                        \_\                                            /_/
 
-       Copyright (c) 2020 UL HPC Team <hpc-team@uni.lu>
+       Copyright (c) 2020-2021 UL HPC Team <hpc-team@uni.lu>
 
 Various HPC Tools and helper scripts/functions (slurm, ssh etc.)
 

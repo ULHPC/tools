@@ -70,7 +70,9 @@ sjoin(){
     else
         JOBID=$1
         [[ -n $2 ]] && NODE="-w $2"
-        srun --jobid $JOBID --gres=gpu:0 $NODE --pty bash -i
+        cmd="srun --jobid $JOBID --gres=gpu:0 $NODE --pty bash -i"
+        echo "# ${cmd}"
+        ${cmd}
     fi
 }
 # Stats on past job
