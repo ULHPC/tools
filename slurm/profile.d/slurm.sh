@@ -70,7 +70,7 @@ sjoin(){
     else
         JOBID=$1
         [[ -n $2 ]] && NODE="-w $2"
-        srun --jobid $JOBID $NODE --pty bash -i
+        srun --jobid $JOBID --gres=gpu:0 $NODE --pty bash -i
     fi
 }
 # Stats on past job
@@ -348,20 +348,25 @@ acct(){
         echo
         echo "=> check associated users to the '$1' account"
         cmd="sacctmgr show association where accounts=\"${1}\" format=account%20,user,qos%50 withsubaccounts"
-        echo "# ${cmd}"
+        echo "# ${cmd}"q
         ${cmd}
     fi
 }
 sassoc() {
     local user=${1:-$(whoami)}
-    cmd="sacctmgr show association where users=$user format=cluster,account%20,user,share,qos%50,maxjobs,maxsubmit,maxtres,"
+    cmd="sacctmgr show association where users=$user format=cluster,account%20,user%15,share,qos%50,maxjobs,maxsubmit,maxtres,"
     if [ -n "$($cmd -n -P)" ]; then
         echo "# ${cmd}"
         $cmd
-        echo "# Default account: "
+        echo "### Default account: "
         cmd="sacctmgr show user where name=\"${1}\" format=DefaultAccount -P -n"
-        echo "# ${cmd}"
-        $cmd
+        echo "#    ${cmd}"
+        acct=$($cmd)
+        echo $acct
+        echo "### [L2] Grand-parent account"
+        cmd="sacctmgr show account where name=${acct} format=Org -n -P"
+        echo "#    ${cmd}"
+        ${cmd}
     else
         cmd="sacctmgr show association where accounts=$user format=cluster,account%20,user,share,qos%50,maxjobs,maxsubmit,maxtres"
         echo "# ${cmd}"
@@ -398,8 +403,9 @@ susage() {
             -y | -Y | --year)  start="$(date +%Y)-01-01";;
             -p | --partition)  shift; part=$1;;
             -h | --help)
-                echo "Usage: susage [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD] ";
-                echo "  For a specific user (if accounting rights granted): susage [...] -u <user>";
+                echo "Usage: susage [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD]";
+                echo "  For a specific user (if accounting rights granted):    susage [...] -u <user>";
+                echo "  For a specific account (if accounting rights granted): susage [...] -A <account>";
                 echo "Display past job usage summary"
                 return;;
             *) options=$*; break;;
@@ -414,4 +420,94 @@ susage() {
     cmd="sacct -X -S ${start} -E ${end} ${options} --partition ${part} --format state --noheader -P"
     echo "# ${cmd} | sort | uniq -c"
     ${cmd} | sort | uniq -c
+}
+
+# utility function used by other things, in particular the sbill utility
+# Courtesy: https://github.com/NERSC/slurm-helpers/blob/master/functions.sh
+dhms_to_sec () {
+  local usage="$0 D:H:M:S"$'\n'
+  usage+='print number of seconds corresponding to a timespan'$'\n'
+  usage+='copes with leading negative sign'$'\n'
+  usage+='accepted formats are:'$'\n'
+  usage+='  [-][[[D:]H:]M:]S'$'\n'
+  usage+='  [-][[[D-]H:]M:]S'$'\n'
+  usage+='Examples:'$'\n'
+  usage+='  1-12:00:00     1 day 12 hours'$'\n'
+  usage+='  2:00:01:00     2 days and 1 minute'$'\n'
+  usage+='  -30:00         negative half an hour'$'\n'
+  if [[ $# -ne 1 || $1 =~ ^-h ]] ; then
+    echo "$usage"
+    return 1
+  else
+    local total=0
+    local -a mult=(1 60 3600 86400)
+    # deal with leading -ive sign and turns day separator to :
+    local a=${1:0:1}
+    local b=${1:1}
+    local IFS=':'
+    local -a val=(${a}${b/-/:})
+    unset IFS
+    # leading "-" sign will now be ":"
+    if [[ ${val[0]} =~ ^(-?)([0-9]+)$ ]]; then
+      # deal with negatives:
+      local sign=${BASH_REMATCH[1]}
+      val[0]=${BASH_REMATCH[2]}
+      local i=${#val[@]}
+      local j=0
+      (( i > 4 )) && return 1
+      while (( i > 0 )); do
+        let i-=1
+        let total+=$(( ${val[$i]/#0}*${mult[$j]} ))
+        let j+=1
+      done
+      #_retstr=
+      printf "%s\n" "${sign}${total}"
+      return 0
+    fi
+  fi
+  echo "$usage"
+  return 1
+}
+
+###
+# Job billing utility
+##
+sbill() {
+    local start=$(date +%F)
+    local end=$(date +%F)
+    local part="batch,gpu,bigmem"
+    local jobid="${SLURM_JOBID}"
+    local options=""
+    while [ -n "$1" ]; do
+        case $1 in
+            -S | --start) shift; start=$1;;
+            -E | --end)   shift; end=$1;;
+            -m | -M | --month) start="$(date +%Y-%m)-01";;
+            -y | -Y | --year)  start="$(date +%Y)-01-01";;
+            -j | --jobid)  shift; jobid=$1;;
+            -h | --help)
+                echo "Usage: sbill -j <jobid>"
+                # echo "       sbill [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD]";
+                # echo "  For a specific user (if accounting rights granted):    susage [...] -u <user>";
+                # echo "  For a specific account (if accounting rights granted): susage [...] -A <account>";
+                echo "Display job charging / billing summary"
+                return;;
+#            *) options=$*; break;;
+            *) jobid=$*; break;;
+        esac
+        shift
+    done
+    if [ -n "${jobid}" ]; then
+        cmd="sacct -X --format=AllocTRES%60,Elapsed -j ${jobid}"
+        echo "# ${cmd}"
+        $cmd
+        local brate=$($cmd -n -P | cut -d '|' -f 1 | tr ',' '\n' | grep billing | cut -d '=' -f 2)
+        local dhms=$(sacct -X --format=Elapsed -j ${jobid} -n -P)
+        local sec=$(dhms_to_sec $dhms)
+        local usage=$(printf "%0.2f\n" $(echo "$brate*$sec/3600" | bc -l))
+        local price=$(printf "%0.2f€ HT\n" $(echo "$usage*${ULHPC_SERVICE_UNIT_PRICE:-0.03}" | bc -l))
+        # echo "   - Billing rate: ${brate}"
+        # echo "   - walltime: ${dhms} = ${sec} s"
+        echo "       Total usage: $usage SU (indicative price: $price)"
+    fi
 }
