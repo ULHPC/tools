@@ -348,20 +348,25 @@ acct(){
         echo
         echo "=> check associated users to the '$1' account"
         cmd="sacctmgr show association where accounts=\"${1}\" format=account%20,user,qos%50 withsubaccounts"
-        echo "# ${cmd}"
+        echo "# ${cmd}"q
         ${cmd}
     fi
 }
 sassoc() {
     local user=${1:-$(whoami)}
-    cmd="sacctmgr show association where users=$user format=cluster,account%20,user,share,qos%50,maxjobs,maxsubmit,maxtres,"
+    cmd="sacctmgr show association where users=$user format=cluster,account%20,user%15,share,qos%50,maxjobs,maxsubmit,maxtres,"
     if [ -n "$($cmd -n -P)" ]; then
         echo "# ${cmd}"
         $cmd
-        echo "# Default account: "
+        echo "### Default account: "
         cmd="sacctmgr show user where name=\"${1}\" format=DefaultAccount -P -n"
-        echo "# ${cmd}"
-        $cmd
+        echo "#    ${cmd}"
+        acct=$($cmd)
+        echo $acct
+        echo "### [L2] Grand-parent account"
+        cmd="sacctmgr show account where name=${acct} format=Org -n -P"
+        echo "#    ${cmd}"
+        ${cmd}
     else
         cmd="sacctmgr show association where accounts=$user format=cluster,account%20,user,share,qos%50,maxjobs,maxsubmit,maxtres"
         echo "# ${cmd}"
