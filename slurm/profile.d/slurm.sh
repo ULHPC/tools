@@ -166,7 +166,7 @@ userjobs(){
 
 ## sinfo helpers
 alias nodelist='sinfo -e -o "%15N %5D %6X %5Y %8Z %5c %8m  %20f %20G"'
-alias allocnodes='sinfo -h -t mix,alloc -o %N'
+alias allocnodes='sinfo -h -t mix,alloc,resv -o %N'
 alias idlenodes='sinfo -h -t idle -o %N'
 alias deadnodes='sinfo -d'
 alias sissues='sinfo -R -o "%45E %19H %6t %N"'
