@@ -102,7 +102,7 @@ function si {
     # if [[ $options != *"--mem"* ]]; then
     #     options="${options} --mem-per-cpu 4096"
     # fi
-    cmd="srun -p interactive --qos debug -C batch $options --pty bash"
+    cmd="srun -p interactive --qos debug -C batch $options --pty bash -i"
     echo "# ${cmd}"
     $cmd
 }
@@ -115,7 +115,7 @@ function si-gpu {
     # if [[ $options != *"--mem"* ]]; then
     #     options="${options} --mem-per-cpu 27000"
     # fi
-    cmd="srun -p interactive --qos debug -C gpu $options --pty bash"
+    cmd="srun -p interactive --qos debug -C gpu $options --pty bash -i"
     echo "# ${cmd}"
     $cmd
 }
@@ -124,7 +124,7 @@ function si-bigmem {
     # if [[ $options != *"--mem"* ]]; then
     #     options="${options} --mem-per-cpu 27000"
     # fi
-    cmd="srun -p interactive --qos debug -C bigmem $options --pty bash"
+    cmd="srun -p interactive --qos debug -C bigmem $options --pty bash -i"
     echo "# ${cmd}"
     $cmd
 }
@@ -335,7 +335,7 @@ acct(){
         echo " => get user/account holder"
         return
     fi
-    cmd1="sacctmgr show user where name=\"${1}\" format=user,account%20,DefaultAccount%20,share,qos%50 withassoc" # if user (parent is account holder)
+    cmd1="sacctmgr show user where name=\"${1}\" format=user%15,account%20,DefaultAccount%20,share,qos%50 withassoc" # if user (parent is account holder)
     cmd2="sacctmgr show account where name=\"${1}\" format=Org,account%20,descr%100"   # if account holder (parent is organization/department)
     echo "# ${cmd1}"
     if [ -n "$($cmd1 -n -P)" ]; then
@@ -414,7 +414,7 @@ susage() {
         esac
         shift
     done
-    cmd="sacct -X -S ${start} -E ${end} ${options} --format User,JobID,partition%12,state,time,elapsed,nnodes,ncpus,nodelist"
+    cmd="sacct -X -S ${start} -E ${end} ${options} --format User,JobID,partition%12,qos,state,time,elapsed,nnodes,ncpus,nodelist"
     echo "# ${cmd}"
     ${cmd}
     echo
