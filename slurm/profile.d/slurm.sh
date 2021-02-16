@@ -490,8 +490,8 @@ sbill() {
             -h | --help)
                 echo "Usage: sbill -j <jobid>"
                 # echo "       sbill [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD]";
-                # echo "  For a specific user (if accounting rights granted):    susage [...] -u <user>";
-                # echo "  For a specific account (if accounting rights granted): susage [...] -A <account>";
+                # echo "  For a specific user (if accounting rights granted):    sbill [...] -u <user>";
+                # echo "  For a specific account (if accounting rights granted): sbill [...] -A <account>";
                 echo "Display job charging / billing summary"
                 return;;
 #            *) options=$*; break;;
