@@ -163,6 +163,19 @@ userjobs(){
     echo "# ${cmd}"
     eval $cmd
 }
+sabuse(){
+    local opts=$*
+    local core_threshold=$((28*5))
+    if  [ "$1" == "-h" ]; then
+        echo "Usage: sabuse [-p <part>] [-u <username>] [-A <account>]"
+        echo " => show among running jobs aggreated stats of total core usage per user"
+        return
+    fi
+    echo "=> List users with running jobs totalling more than ${core_threshold} cores / $opts"
+    for l in $(squeue $opts -t R --noheader -o %u | sort | uniq); do
+         printf "%18s: " $l; squeue $opts -u $l --noheader -o %C | paste -sd+ | bc; 
+    done | awk -v min="${core_threshold}" '{if ($2>min) print $0}' | sort -n -k 2 -r
+}
 
 ## sinfo helpers
 alias nodelist='sinfo -e -o "%15N %5D %6X %5Y %8Z %5c %8m  %20f %20G"'
@@ -490,8 +503,8 @@ sbill() {
             -h | --help)
                 echo "Usage: sbill -j <jobid>"
                 # echo "       sbill [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD]";
-                # echo "  For a specific user (if accounting rights granted):    susage [...] -u <user>";
-                # echo "  For a specific account (if accounting rights granted): susage [...] -A <account>";
+                # echo "  For a specific user (if accounting rights granted):    sbill [...] -u <user>";
+                # echo "  For a specific account (if accounting rights granted): sbill [...] -A <account>";
                 echo "Display job charging / billing summary"
                 return;;
 #            *) options=$*; break;;
