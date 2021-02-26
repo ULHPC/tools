@@ -369,7 +369,7 @@ acct(){
 }
 sassoc() {
     local user=${1:-$(whoami)}
-    cmd="sacctmgr show association where users=$user format=cluster,account%20,user%15,share,qos%50,maxjobs,maxsubmit,maxtres,"
+    cmd="sacctmgr show association where users=$user format=cluster,account%20,user%15,share,qos%50,maxjobs,maxsubmit,maxtres,GrpTRES"
     if [ -n "$($cmd -n -P)" ]; then
         echo "# ${cmd}"
         $cmd
@@ -383,7 +383,7 @@ sassoc() {
         echo "#    ${cmd}"
         ${cmd}
     else
-        cmd="sacctmgr show association where accounts=$user format=cluster,account%20,user,share,qos%50,maxjobs,maxsubmit,maxtres"
+        cmd="sacctmgr show association where accounts=$user format=cluster,account%20,user,share,qos%50,maxjobs,maxsubmit,maxtres,grptres"
         echo "# ${cmd}"
         ${cmd}
         cmd="sacctmgr show association where parent=$user format=cluster,account%20,share,qos%50,maxjobs,maxsubmit,maxtres"
