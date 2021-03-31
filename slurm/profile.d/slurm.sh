@@ -102,7 +102,7 @@ function si {
     # if [[ $options != *"--mem"* ]]; then
     #     options="${options} --mem-per-cpu 4096"
     # fi
-    cmd="srun -p interactive --qos debug -C batch $options --pty bash -i"
+    cmd="salloc -p interactive --qos debug -C batch $options"
     echo "# ${cmd}"
     $cmd
 }
@@ -115,7 +115,7 @@ function si-gpu {
     # if [[ $options != *"--mem"* ]]; then
     #     options="${options} --mem-per-cpu 27000"
     # fi
-    cmd="srun -p interactive --qos debug -C gpu $options --pty bash -i"
+    cmd="salloc -p interactive --qos debug -C gpu $options"
     echo "# ${cmd}"
     $cmd
 }
@@ -124,7 +124,7 @@ function si-bigmem {
     # if [[ $options != *"--mem"* ]]; then
     #     options="${options} --mem-per-cpu 27000"
     # fi
-    cmd="srun -p interactive --qos debug -C bigmem $options --pty bash -i"
+    cmd="salloc -p interactive --qos debug -C bigmem $options"
     echo "# ${cmd}"
     $cmd
 }
