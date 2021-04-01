@@ -179,7 +179,7 @@ sabuse(){
     fi
     echo "=> List users with running jobs totalling more than ${core_threshold} cores / $opts"
     for l in $(squeue $opts -t R --noheader -o %u | sort | uniq); do
-         printf "%18s: " $l; squeue $opts -u $l --noheader -o %C | paste -sd+ | bc; 
+         printf "%18s: " $l; squeue $opts -u $l --noheader -o %C | paste -sd+ | bc;
     done | awk -v min="${core_threshold}" '{if ($2>min) print $0}' | sort -n -k 2 -r
 }
 
@@ -201,7 +201,7 @@ sfeatures() {
 gpuload() {
     #gpumax=$(sinfo -h -N -p gpu -o %G | cut -d : -f3 | paste -sd + | bc)
     gpumax=96
-    gpuused=$(sacct -n -s R -a -X --format=Reqgres | grep gpu | cut -d : -f 2 | paste -sd '+' | bc);
+    gpuused=$(sacct -P -n -s R -a -X --format=ReqTRES | grep -o 'gpu=[^,]*' | cut -d= -f2 | paste -sd '+' | bc)
     [ -z "${gpuused}" ] && gpuused=0
     gpuusage=$(echo "$gpuused*100/$gpumax" | bc -l)
     printf "GPU: %s/%s (%2.1f%%)\n" "$gpuused" "$gpumax" "$gpuusage"
