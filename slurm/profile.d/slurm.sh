@@ -98,11 +98,17 @@ alias scurrent="scontrol show job $SLURM_JOBID"
 
 
 function si {
-    local options="$*"
-    # if [[ $options != *"--mem"* ]]; then
-    #     options="${options} --mem-per-cpu 4096"
-    # fi
-    cmd="salloc -p interactive --qos debug -C batch $options"
+    local options=""
+    local constraints="batch"
+    while [ -n "$1" ]; do
+        case $1 in
+            -C | --constraint) shift; constraints=${constraints}","$1;;
+            *) options=${options}" "$1;
+        esac
+        shift
+    done
+
+    cmd="salloc -p interactive --qos debug -C ${constraints} ${options}"
     echo "# ${cmd}"
     $cmd
 }
