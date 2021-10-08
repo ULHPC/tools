@@ -131,7 +131,7 @@ function si-gpu {
 }
 function si-bigmem {
     if [ "$ULHPC_CLUSTER" == "aion" ]; then
-        echo "Job sumission canceled: you can't submit GPU jobs on Aion."
+        echo "Job sumission canceled: you can't submit Bigmem jobs on Aion."
         return
     fi
     local options="$*"
@@ -380,7 +380,7 @@ aionstat(){
     printf "\n"
     pload -M aion -a
     printf "\n"
-    qload -M aion -a 
+    qload -M aion -a
     printf "\n"
     echo "Drained nodes: $(sinfo -h -t drain -o '%D')"
     printf "%0.s-" {1..50} ; printf "\n"
