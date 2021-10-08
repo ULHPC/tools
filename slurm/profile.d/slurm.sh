@@ -66,7 +66,7 @@ alias ssj='scontrol show job'
 sjoin(){
     if [[ -z $1 ]]; then
         echo "Job ID not given."
-        echo "Usage: sjoin <jobid> [iris-XXX]"
+        echo "Usage: sjoin <jobid> [(iris|aion)-XXX]"
     else
         JOBID=$1
         [[ -n $2 ]] && NODE="-w $2"
@@ -113,6 +113,10 @@ function si {
     $cmd
 }
 function si-gpu {
+    if [ "$ULHPC_CLUSTER" == "aion" ]; then
+        echo "Job sumission canceled: you can't submit GPU jobs on Aion."
+        return
+    fi
     local options="$*"
     if [[ $options != *"-G"* ]]; then
         echo '# /!\ WARNING: append -G 1 to really reserve a GPU'
@@ -126,6 +130,10 @@ function si-gpu {
     $cmd
 }
 function si-bigmem {
+    if [ "$ULHPC_CLUSTER" == "aion" ]; then
+        echo "Job sumission canceled: you can't submit GPU jobs on Aion."
+        return
+    fi
     local options="$*"
     # if [[ $options != *"--mem"* ]]; then
     #     options="${options} --mem-per-cpu 27000"
@@ -143,9 +151,13 @@ function sq() {
     $cmd
 }
 largejobs(){
-    echo -ne "=> List running jobs using more than 28 cores (slurm CPUs)\n"
+    local core_thres=27
+    if [ "$ULHPC_CLUSTER" == "aion" ]; then
+        core_thres=127
+    fi
+    echo -ne "=> List running jobs using more than ${core_thres} cores (slurm CPUs)\n"
     date +%F-%T
-    squeue -h -o '%i,%C' -t R | awk -F , '{if ($2>28) {print $1}}' | paste -sd ',' | xargs squeue -j
+    squeue -h -o '%i,%C' -t R | awk -v cores="$core_thres" -F , '{if ($2>cores) {print $1}}' | paste -sd ',' | xargs squeue -j
 }
 longjobs(){
     echo -ne "=> List jobs running/expected to run for more than 5 days\n"
@@ -172,6 +184,9 @@ userjobs(){
 sabuse(){
     local opts=$*
     local core_threshold=$((28*5))
+    if [ "$ULHPC_CLUSTER" == "aion" ]; then
+        core_threshold=$((128*5))
+    fi
     if  [ "$1" == "-h" ]; then
         echo "Usage: sabuse [-p <part>] [-u <username>] [-A <account>]"
         echo " => show among running jobs aggreated stats of total core usage per user"
@@ -199,9 +214,20 @@ sfeatures() {
 
 ## Utilization Report
 gpuload() {
+    local cluster="$ULHPC_CLUSTER"
+     while [ -n "$1" ]; do
+        case $1 in
+            -M | --cluster) shift; cluster=$1;;
+        esac
+        shift
+    done
+    if [ "$cluster" != "iris" ]; then
+        echo "There are no GPU jobs on ${cluster}. Aborting."
+        return
+    fi
     #gpumax=$(sinfo -h -N -p gpu -o %G | cut -d : -f3 | paste -sd + | bc)
     gpumax=96
-    gpuused=$(sacct -P -n -s R -a -X --format=ReqTRES | grep -o 'gpu=[^,]*' | cut -d= -f2 | paste -sd '+' | bc)
+    gpuused=$(sacct -M ${cluster} -P -n -s R -a -X --format=ReqTRES | grep -o 'gpu=[^,]*' | cut -d= -f2 | paste -sd '+' | bc)
     [ -z "${gpuused}" ] && gpuused=0
     gpuusage=$(echo "$gpuused*100/$gpumax" | bc -l)
     printf "GPU: %s/%s (%2.1f%%)\n" "$gpuused" "$gpumax" "$gpuusage"
@@ -211,14 +237,16 @@ gpuload() {
 pload() {
     local no_header=""
     local partition=""
+    local cluster="$ULHPC_CLUSTER"
     while [ -n "$1" ]; do
         case $1 in
-            -a | --all) partition="batch gpu bigmem";;
+            -a | --all) [[ "$cluster" == "aion" ]] && partition="interactive batch" || partition="interactive batch gpu bigmem" ;;
             -h | --no-header) no_header=$1;;
+            -M | --cluster) shift; cluster=$1;;
             i  | int*) partition="interactive";;
             b  | bat*) partition="batch";;
-            g  | gpu*) partition="gpu";;
-            m  | big*) partition="bigmem";;
+            g  | gpu*) [[ "$cluster" != "iris" ]] && echo "There are no GPU jobs on ${cluster}. Aborting." && return || partition="gpu";;
+            m  | big*) [[ "$cluster" != "iris" ]] && echo "There are no bigmem jobs on ${cluster}. Aborting." && return || partition="bigmem";;
             *) echo "Unknown partition '$1'"; return;;
         esac
         shift
@@ -226,8 +254,9 @@ pload() {
     if [[ -z "$partition" ]]; then
         echo "Usage: pload [-a] [--no-header] <partition>"
         echo " => Show current load of the slurm partition <partition>, eventually without header"
-        echo "    <partition> shortcuts: i=interactive b=batch g=gpu m=bigmem"
+        echo "    <partition> shortcuts: i=interactive (iris,aion) b=batch (iris,aion) g=gpu (iris) m=bigmem (iris)"
         echo -e " Options:\n   -a: show all partition"
+        echo "   -M: specify a cluster"
         return
     fi
     [ -z "$no_header" ] && \
@@ -235,21 +264,21 @@ pload() {
     for p in $partition; do
         if [ "$p" == "interactive" ]; then
             cpumax="$(sacctmgr show qos where name=debug format=GrpTRES -n -P)"
-            cpuused=$(squeue --qos debug --format %C -h | paste -sd+ | bc)
+            cpuused=$(squeue -M ${cluster} --qos debug --format %C -h | paste -sd+ | bc)
             cpufree='n/a'
             usageratio='n/a'
             printf "%12s %8s %9s %9s %10s%%\n" "($p)" "$cpumax" "$cpuused" "$cpufree" "$usageratio"
 
         else
             # allocated/idle/other/total
-            usage=$(sinfo -h -p $p --format=%C)
+            usage=$(sinfo -M ${cluster} -h -p $p --format=%C)
             cpumax=$(echo $usage | cut -d '/' -f 4)
             # include other (draining, down)
             cpuused=$(( $(echo $usage | cut -d '/' -f 1) + $(echo $usage | cut -d '/' -f 3) ))
             #cpuused=$(echo $usage | cut -d '/' -f 1)
             cpufree=$(echo $usage | cut -d '/' -f 2)
             usageratio=$(echo "$cpuused*100/$cpumax" | bc -l)
-            [ "$p" == "gpu" ] && gpustats=$(gpuload) || gpustats=""
+            [ "$p" == "gpu" ] && gpustats=$(gpuload -M ${cluster}) || gpustats=""
             #jobs=$(squeue -p $p -t R,PD -h -o "(%t)" | sort -r | uniq -c | xargs echo | sed 's/) /),/')
             printf "%12s %8s %9s %9s %10.1f%% %s\n" "$p" "$cpumax" "$cpuused" "$cpufree" "$usageratio" "$gpustats"
         fi
@@ -277,9 +306,11 @@ qload() {
     local no_header=""
     local qos_list=""
     local show_all=""
+    local cluster="$ULHPC_CLUSTER"
     while [ -n "$1" ]; do
         case $1 in
             -a | --all) show_all=$1; qos_list="besteffort low normal long debug high urgent";;
+            -M | --cluster) shift; cluster=$1;;
             -h | --no-header) no_header=$1;;
             *) qos_list=$*; break;;
         esac
@@ -290,9 +321,10 @@ qload() {
         echo " => Show current load of the slurm QOS <qos>, eventually without header"
         echo "    <qos> shortcuts: b=besteffort l=low n=normal g=long d=debug h=high u=urgent"
         echo -e " Options:\n   -a: show all qos"
+        echo "   -M: specify a cluster"
         return
     fi
-    partitionlimits=$(sinfo -a -h --format=%P,%C)
+    partitionlimits=$(sinfo -M ${cluster} -a -h --format=%P,%C)
     allcpuamount=$(echo  "$partitionlimits" | grep "all" | awk -F '/' '{ print $4 }')
     unavailablecpu=$(echo "$partitionlimits" | grep "all" | awk -F '/' '{ print $3 }')
     [ "$unavailablecpu" -gt "0" ] && comment="(*) $unavailablecpu CPU unavailable" || comment=""
@@ -312,7 +344,7 @@ qload() {
             urgent     | u* ) partition="all";         qos="urgent";     q=$qos;;
             *) echo "Unknown pattern '$pattern'"; return;;
         esac
-        qoscpualloc=$(squeue -h --qos "$q" -t R -o %C | paste -sd '+' | bc)
+        qoscpualloc=$(squeue -M ${cluster}  -h --qos "$q" -t R -o %C | paste -sd '+' | bc)
         [ -z "$qoscpualloc" ] && qoscpualloc=0
         totalused=$((totalused+qoscpualloc))
 
@@ -326,26 +358,35 @@ qload() {
         printf "%16s %9s %9.1f%%\n" "TOTAL:" "$totalused/$allcpuamount" "$totalusage"
     fi
 }
-alias irisqosusage='qload -a'
-alias qosusageinteractive='qload i'
-alias qosusagebatch='qload b'
-alias qosusagelong='qload l'
-alias qosusagebigmem='qload m'
-alias qosusagegpu='qload g'
+alias irisqosusage='qload -M iris -a'
+alias aionqosusage='qload -M aion -a'
+alias qosusage='qload -a'
 
 irisstat(){
-    sinfo -h --format=%C | awk -F '/' '{printf "Utilization: %.2f%%\n", $1/$4*100}'
+    sinfo -M iris -h --format=%C | awk -F '/' '{printf "Utilization: %.2f%%\n", $1/$4*100}'
     printf "\n"
-    pload -a
+    pload -M iris -a
     printf "\n"
-    qload -a
+    qload -M iris -a
     printf "\n"
     echo "Drained nodes: $(sinfo -h -t drain -o '%D')"
     printf "%0.s-" {1..50} ; printf "\n"
     printf "Jobs status: \n"
-    squeue -h -o "%t,%r" | sort | uniq -c | sort -r
+    squeue -M iris -h -o "%t,%r" | sort | uniq -c | sort -r
 }
 
+aionstat(){
+    sinfo -M aion -h --format=%C | awk -F '/' '{printf "Utilization: %.2f%%\n", $1/$4*100}'
+    printf "\n"
+    pload -M aion -a
+    printf "\n"
+    qload -M aion -a 
+    printf "\n"
+    echo "Drained nodes: $(sinfo -h -t drain -o '%D')"
+    printf "%0.s-" {1..50} ; printf "\n"
+    printf "Jobs status: \n"
+    squeue -M aion -h -o "%t,%r" | sort | uniq -c | sort -r
+}
 
 ## sacctmgr helpers
 acct(){
@@ -427,6 +468,7 @@ susage() {
                 echo "Usage: susage [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD]";
                 echo "  For a specific user (if accounting rights granted):    susage [...] -u <user>";
                 echo "  For a specific account (if accounting rights granted): susage [...] -A <account>";
+                echo "  For a specific cluster (if accounting rights granted): susage [...] --cluster <cluster>";
                 echo "Display past job usage summary"
                 return;;
             *) options=$*; break;;
