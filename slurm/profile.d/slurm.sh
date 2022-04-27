@@ -1,4 +1,4 @@
-# Time-stamp: <Thu 2021-02-04 13:50 svarrette>
+# Time-stamp: <Wed 2022-04-27 18:28 svarrette>
 ################################################################################
 # [/etc/]profile.d/slurm.sh - Various Slurm helper functions and aliases to
 # .                           use on the UL HPC Platform (https://hpc.uni.lu)
@@ -42,7 +42,7 @@ export SQUEUE_FORMAT="%.8i %.6P %.9q %.20j %.10u %.4D %.5C %.2t %.12M %.12L %.8Q
 # | %M         | TimeUsed     | Time used by the job:  days-hours:minutes:seconds  |
 # | %L         | TimeLeft     | Time left for the job: days-hours:minutes:seconds. |
 
-# export SPRIO_FORMAT="%.15i %9r %.8u %.10Y %.10A %.10F %.10P %.10Q"
+export SPRIO_FORMAT="%.10i %9r %.8u %.10Y %.10A %.10F %.10P %.10Q"
 # USE 'sprio -w' to see current weights
 ### Most useful format field for sprio (see man sprio)
 #   --format
@@ -194,7 +194,7 @@ sabuse(){
     fi
     echo "=> List users with running jobs totalling more than ${core_threshold} cores / $opts"
     for l in $(squeue $opts -t R --noheader -o %u | sort | uniq); do
-         printf "%18s: " $l; squeue $opts -u $l --noheader -o %C | paste -sd+ | bc;
+        printf "%18s: " $l; squeue $opts -u $l --noheader -o %C | paste -sd+ | bc;
     done | awk -v min="${core_threshold}" '{if ($2>min) print $0}' | sort -n -k 2 -r
 }
 
@@ -210,7 +210,6 @@ sfeatures() {
     echo "# ${cmd}"
     eval ${cmd}
 }
-
 
 ## Utilization Report
 gpuload() {
@@ -389,6 +388,25 @@ aionstat(){
 }
 
 ## sacctmgr helpers
+defaultacct(){
+    local user=$(whoami)
+    local verbose=""
+    while [ -n "$1" ]; do
+        case $1 in
+            -h | --help)
+                echo "Usage: defaultacct [-v] [<user>]";
+                echo "Display default Slurm (L3) account associated to the user (Default: $(whoami))";
+                return;;
+            -v) verbose=$1;;
+            *) user=$*; break;;
+        esac
+        shift
+    done
+    cmd="sacctmgr show user where name=\"${user}\" --noheader -P format=DefaultAccount"
+    [ -n "${verbose}" ] && echo "# ${cmd}"
+    ${cmd}
+}
+
 acct(){
     if [[ -z $1 ]]; then
         echo "Usage: acct <login|account>"
@@ -410,12 +428,24 @@ acct(){
         echo
         echo "=> check associated users to the '$1' account"
         cmd="sacctmgr show association where accounts=\"${1}\" format=account%20,user,qos%50 withsubaccounts"
-        echo "# ${cmd}"q
+        echo "# ${cmd}"
         ${cmd}
     fi
 }
 sassoc() {
     local user=${1:-$(whoami)}
+    while [ -n "$1" ]; do
+        case $1 in
+            -h | --help)
+                echo "Usage: sassoc <user|account>";
+                echo "Display default Slurm association tree of account associated to the provided user or account";
+                echo "Default: display association with user  $(whoami)";
+                return;;
+            -v) verbose=$1;;
+            *) user=$*; break;;
+        esac
+        shift
+    done
     cmd="sacctmgr show association where users=$user format=cluster,account%20,user%15,share,qos%50,maxjobs,maxsubmit,maxtres,GrpTRES"
     if [ -n "$($cmd -n -P)" ]; then
         echo "# ${cmd}"
@@ -449,8 +479,33 @@ sqos() {
 alias showqos=sqos
 
 ## Sprio helpers
-alias sp='sprio'
+alias sp='sprio  --format="%.10i %9r %.8u %.10Y %.10A %.10F %.10P %.10Q"'
 alias spl='sprio -l'
+
+## sshare helpers
+ulhpcshare(){
+    local user=$(whoami)
+    local account=""
+    local options=""
+    while [ -n "$1" ]; do
+        case $1 in
+            -u | --users)    shift; user="$1";;
+            -A | --accounts) shift; account="$1"; user="";;
+            -h | --help)
+                echo "Usage: ulhpcshare [-A <account>] [-u <user>]";
+                echo "  For a specific user:    ulhpcshare [...] -u <user>   # default: $(whoami))";
+                echo "  For a specific account: ulhpcshare [...] -A <account>";
+                return;;
+            *) options=$*; break;;
+        esac
+        shift
+    done
+    [ -z "${account}" ] && account="$(sacctmgr show association where users=${user} format=Account --noheader -P | uniq | paste -s -d,)"
+    [ -n "${user}" ]    && options="-u ${user} ${options}" || options="-a ${options}"
+    cmd="sshare -A ${account} ${options} --format=Account,User,RawShares,NormShares,RawUsage,NormUsage,EffectvUsage,LevelFS,FairShare"
+    echo "# ${cmd}"
+    $cmd
+}
 
 susage() {
     local start=$(date +%F)
@@ -461,11 +516,11 @@ susage() {
         case $1 in
             -S | --start) shift; start=$1;;
             -E | --end)   shift; end=$1;;
-            -m | -M | --month) start="$(date +%Y-%m)-01";;
-            -y | -Y | --year)  start="$(date +%Y)-01-01";;
-            -p | --partition)  shift; part=$1;;
+            -m | --month)     start="$(date +%Y-%m)-01";;
+            -y | -Y | --year) start="$(date +%Y)-01-01";;
+            -p | --partition) shift; part=$1;;
             -h | --help)
-                echo "Usage: susage [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD]";
+                echo "Usage: susage [-m] [-Y] [-S YYYY-MM-DD] [-E YYYT-MM-DD] [...]";
                 echo "  For a specific user (if accounting rights granted):    susage [...] -u <user>";
                 echo "  For a specific account (if accounting rights granted): susage [...] -A <account>";
                 echo "  For a specific cluster (if accounting rights granted): susage [...] --cluster <cluster>";
@@ -479,6 +534,9 @@ susage() {
     echo "# ${cmd}"
     ${cmd}
     echo
+    echo "### Statistics on 'interactive' partition (between ${start} and ${end})"
+    echo "$(sacct -X -S ${start} -E ${end} ${options} --partition interactive --format nodelist --noheader -P| grep -v None |wc -l) interactive jobs"
+    echo
     echo "### Statistics on '${part}' partition(s)"
     cmd="sacct -X -S ${start} -E ${end} ${options} --partition ${part} --format state --noheader -P"
     echo "# ${cmd} | sort | uniq -c"
@@ -488,48 +546,48 @@ susage() {
 # utility function used by other things, in particular the sbill utility
 # Courtesy: https://github.com/NERSC/slurm-helpers/blob/master/functions.sh
 dhms_to_sec () {
-  local usage="$0 D:H:M:S"$'\n'
-  usage+='print number of seconds corresponding to a timespan'$'\n'
-  usage+='copes with leading negative sign'$'\n'
-  usage+='accepted formats are:'$'\n'
-  usage+='  [-][[[D:]H:]M:]S'$'\n'
-  usage+='  [-][[[D-]H:]M:]S'$'\n'
-  usage+='Examples:'$'\n'
-  usage+='  1-12:00:00     1 day 12 hours'$'\n'
-  usage+='  2:00:01:00     2 days and 1 minute'$'\n'
-  usage+='  -30:00         negative half an hour'$'\n'
-  if [[ $# -ne 1 || $1 =~ ^-h ]] ; then
+    local usage="$0 D:H:M:S"$'\n'
+    usage+='print number of seconds corresponding to a timespan'$'\n'
+    usage+='copes with leading negative sign'$'\n'
+    usage+='accepted formats are:'$'\n'
+    usage+='  [-][[[D:]H:]M:]S'$'\n'
+    usage+='  [-][[[D-]H:]M:]S'$'\n'
+    usage+='Examples:'$'\n'
+    usage+='  1-12:00:00     1 day 12 hours'$'\n'
+    usage+='  2:00:01:00     2 days and 1 minute'$'\n'
+    usage+='  -30:00         negative half an hour'$'\n'
+    if [[ $# -ne 1 || $1 =~ ^-h ]] ; then
+        echo "$usage"
+        return 1
+    else
+        local total=0
+        local -a mult=(1 60 3600 86400)
+        # deal with leading -ive sign and turns day separator to :
+        local a=${1:0:1}
+        local b=${1:1}
+        local IFS=':'
+        local -a val=(${a}${b/-/:})
+        unset IFS
+        # leading "-" sign will now be ":"
+        if [[ ${val[0]} =~ ^(-?)([0-9]+)$ ]]; then
+            # deal with negatives:
+            local sign=${BASH_REMATCH[1]}
+            val[0]=${BASH_REMATCH[2]}
+            local i=${#val[@]}
+            local j=0
+            (( i > 4 )) && return 1
+            while (( i > 0 )); do
+                let i-=1
+                let total+=$(( ${val[$i]/#0}*${mult[$j]} ))
+                let j+=1
+            done
+            #_retstr=
+            printf "%s\n" "${sign}${total}"
+            return 0
+        fi
+    fi
     echo "$usage"
     return 1
-  else
-    local total=0
-    local -a mult=(1 60 3600 86400)
-    # deal with leading -ive sign and turns day separator to :
-    local a=${1:0:1}
-    local b=${1:1}
-    local IFS=':'
-    local -a val=(${a}${b/-/:})
-    unset IFS
-    # leading "-" sign will now be ":"
-    if [[ ${val[0]} =~ ^(-?)([0-9]+)$ ]]; then
-      # deal with negatives:
-      local sign=${BASH_REMATCH[1]}
-      val[0]=${BASH_REMATCH[2]}
-      local i=${#val[@]}
-      local j=0
-      (( i > 4 )) && return 1
-      while (( i > 0 )); do
-        let i-=1
-        let total+=$(( ${val[$i]/#0}*${mult[$j]} ))
-        let j+=1
-      done
-      #_retstr=
-      printf "%s\n" "${sign}${total}"
-      return 0
-    fi
-  fi
-  echo "$usage"
-  return 1
 }
 
 ###
@@ -545,8 +603,8 @@ sbill() {
         case $1 in
             -S | --start) shift; start=$1;;
             -E | --end)   shift; end=$1;;
-            -m | -M | --month) start="$(date +%Y-%m)-01";;
-            -y | -Y | --year)  start="$(date +%Y)-01-01";;
+            -m | --month) start="$(date +%Y-%m)-01";;
+            -y | -Y | --year)    start="$(date +%Y)-01-01";;
             -j | --jobid)  shift; jobid=$1;;
             -h | --help)
                 echo "Usage: sbill -j <jobid>"
@@ -555,7 +613,7 @@ sbill() {
                 # echo "  For a specific account (if accounting rights granted): sbill [...] -A <account>";
                 echo "Display job charging / billing summary"
                 return;;
-#            *) options=$*; break;;
+            #            *) options=$*; break;;
             *) jobid=$*; break;;
         esac
         shift
