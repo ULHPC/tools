@@ -1,4 +1,4 @@
-# Time-stamp: <Wed 2022-04-27 18:28 svarrette>
+# Time-stamp: <Thu 2022-04-28 08:36 svarrette>
 ################################################################################
 # [/etc/]profile.d/slurm.sh - Various Slurm helper functions and aliases to
 # .                           use on the UL HPC Platform (https://hpc.uni.lu)
@@ -502,7 +502,8 @@ ulhpcshare(){
     done
     [ -z "${account}" ] && account="$(sacctmgr show association where users=${user} format=Account --noheader -P | uniq | paste -s -d,)"
     [ -n "${user}" ]    && options="-u ${user} ${options}" || options="-a ${options}"
-    cmd="sshare -A ${account} ${options} --format=Account,User,RawShares,NormShares,RawUsage,NormUsage,EffectvUsage,LevelFS,FairShare"
+    # NormUsage not used in fair tree
+    cmd="sshare -A ${account} ${options} --format=Account,User,RawShares,NormShares,EffectvUsage,LevelFS,FairShare"
     echo "# ${cmd}"
     $cmd
 }
