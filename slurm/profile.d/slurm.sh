@@ -368,7 +368,7 @@ irisstat(){
     printf "\n"
     qload -M iris -a
     printf "\n"
-    echo "Drained nodes: $(sinfo -h -t drain -o '%D')"
+    echo "Drained nodes: $(sinfo -M iris -h -t drain -o '%D')"
     printf "%0.s-" {1..50} ; printf "\n"
     printf "Jobs status: \n"
     squeue -M iris -h -o "%t,%r" | sort | uniq -c | sort -r
@@ -381,7 +381,7 @@ aionstat(){
     printf "\n"
     qload -M aion -a
     printf "\n"
-    echo "Drained nodes: $(sinfo -h -t drain -o '%D')"
+    echo "Drained nodes: $(sinfo -M aion -h -t drain -o '%D')"
     printf "%0.s-" {1..50} ; printf "\n"
     printf "Jobs status: \n"
     squeue -M aion -h -o "%t,%r" | sort | uniq -c | sort -r
