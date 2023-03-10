@@ -114,7 +114,7 @@ function si {
 }
 function si-gpu {
     if [ "$ULHPC_CLUSTER" == "aion" ]; then
-        echo "Job sumission canceled: you can't submit GPU jobs on Aion."
+        echo "Job submission canceled: you can't submit GPU jobs on Aion."
         return
     fi
     local options="$*"
@@ -131,7 +131,7 @@ function si-gpu {
 }
 function si-bigmem {
     if [ "$ULHPC_CLUSTER" == "aion" ]; then
-        echo "Job sumission canceled: you can't submit Bigmem jobs on Aion."
+        echo "Job submission canceled: you can't submit Bigmem jobs on Aion."
         return
     fi
     local options="$*"
