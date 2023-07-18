@@ -70,7 +70,7 @@ sjoin(){
     else
         JOBID=$1
         [[ -n $2 ]] && NODE="-w $2"
-        cmd="srun --jobid $JOBID --overlap --gres=gpu:0 $NODE --pty bash -i"
+        cmd="srun --jobid $JOBID --overlap $NODE --pty bash -i"
         echo "# ${cmd}"
         ${cmd}
     fi
