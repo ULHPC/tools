@@ -194,7 +194,7 @@ sabuse(){
     fi
     echo "=> List users with running jobs totalling more than ${core_threshold} cores / $opts"
     for l in $(squeue $opts -t R --noheader -o %u | sort | uniq); do
-        printf "%18s: " $l; squeue $opts -u $l --noheader -o %C | paste -sd+ | bc;
+        printf "%18s: " $l; squeue $opts -u $l -t R --noheader -o %C | paste -sd+ | bc;
     done | awk -v min="${core_threshold}" '{if ($2>min) print $0}' | sort -n -k 2 -r
 }
 
